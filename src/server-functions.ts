@@ -1,0 +1,89 @@
+import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
+
+const transactionQuerySchema = z.object({
+  search: z.string().optional(),
+  categoryId: z.number().nullable().optional(),
+  accountId: z.string().optional(),
+  pending: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+}).optional()
+
+export const getDashboard = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getDashboardData } = await import('./server/read-models')
+  return getDashboardData()
+})
+
+export const getAccountsData = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getAccountsPageData } = await import('./server/read-models')
+  return getAccountsPageData()
+})
+
+export const getTransactionsData = createServerFn({ method: 'GET' })
+  .inputValidator((data) => transactionQuerySchema.parse(data))
+  .handler(async ({ data }) => {
+    const { getTransactionsPageData } = await import('./server/read-models')
+    return getTransactionsPageData(data)
+  })
+
+export const getCategoriesData = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getCategoriesPageData } = await import('./server/read-models')
+  return getCategoriesPageData()
+})
+
+export const getSetupData = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getSetupPageData } = await import('./server/read-models')
+  return getSetupPageData()
+})
+
+export const claimSimpleFinToken = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({ token: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { claimSimpleFin } = await import('./server/actions')
+    return claimSimpleFin(data)
+  })
+
+export const syncNow = createServerFn({ method: 'POST' }).handler(async () => {
+  const { runManualSync } = await import('./server/actions')
+  return runManualSync()
+})
+
+export const clearSimpleFin = createServerFn({ method: 'POST' }).handler(async () => {
+  const { clearSimpleFinConnection } = await import('./server/actions')
+  return clearSimpleFinConnection()
+})
+
+export const setTransactionCategory = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({
+    transactionId: z.string().min(1),
+    categoryId: z.number().nullable(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const { assignCategory } = await import('./server/actions')
+    return assignCategory(data)
+  })
+
+export const addCategory = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({ name: z.string().min(1) }).parse(data))
+  .handler(async ({ data }) => {
+    const { createCategory } = await import('./server/actions')
+    return createCategory(data)
+  })
+
+export const addCategoryRule = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({
+    categoryId: z.number(),
+    matchText: z.string().min(1),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const { createCategoryRule } = await import('./server/actions')
+    return createCategoryRule(data)
+  })
+
+export const removeCategoryRule = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({ ruleId: z.number() }).parse(data))
+  .handler(async ({ data }) => {
+    const { deleteCategoryRule } = await import('./server/actions')
+    return deleteCategoryRule(data)
+  })

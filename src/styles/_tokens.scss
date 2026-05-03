@@ -1,0 +1,28 @@
+$ink: #17140f;
+$muted: #756c5b;
+$line: #ded5c3;
+$paper: #fbf4e5;
+$paper-strong: #fffaf0;
+$field: #f5ead4;
+$green: #236b46;
+$green-strong: #164a32;
+$red: #a73e2f;
+$amber: #9c6a18;
+$blue: #245b73;
+$shadow: 0 24px 60px rgba(57, 42, 20, 0.14);
+$radius-lg: 28px;
+$radius-md: 18px;
+$radius-sm: 12px;
+
+@mixin card {
+  background: rgba(255, 250, 240, 0.88);
+  border: 1px solid rgba($line, 0.9);
+  border-radius: $radius-lg;
+  box-shadow: $shadow;
+}
+
+@mixin button-reset {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}

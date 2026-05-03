@@ -1,0 +1,191 @@
+@use '../styles/tokens' as *;
+
+.page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.header {
+  align-items: end;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.kicker {
+  color: $muted;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.heading {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.2rem, 6vw, 4.8rem);
+  letter-spacing: -0.07em;
+  line-height: 0.95;
+  margin: 0;
+}
+
+.subtle {
+  color: $muted;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.twoColumn {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(20rem, 0.85fr);
+}
+
+.card {
+  @include card;
+  padding: 1.25rem;
+}
+
+.metric {
+  @include card;
+  display: grid;
+  gap: 0.6rem;
+  min-height: 10rem;
+  padding: 1.25rem;
+}
+
+.label {
+  color: $muted;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.value {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+  letter-spacing: -0.06em;
+}
+
+.positive {
+  color: $green;
+}
+
+.negative {
+  color: $red;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.button {
+  @include button-reset;
+  background: $green-strong;
+  border-radius: 999px;
+  color: white;
+  padding: 0.8rem 1rem;
+}
+
+.secondaryButton {
+  @include button-reset;
+  background: $field;
+  border: 1px solid $line;
+  border-radius: 999px;
+  color: $ink;
+  padding: 0.8rem 1rem;
+}
+
+.field {
+  background: $paper-strong;
+  border: 1px solid $line;
+  border-radius: $radius-sm;
+  color: $ink;
+  padding: 0.75rem 0.9rem;
+}
+
+.tableWrap {
+  @include card;
+  overflow: hidden;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid rgba($line, 0.8);
+  padding: 0.9rem 1rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  background: rgba($field, 0.6);
+  color: $muted;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pill {
+  background: $field;
+  border: 1px solid $line;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.65rem;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.error {
+  background: rgba($red, 0.1);
+  border: 1px solid rgba($red, 0.3);
+  border-radius: $radius-md;
+  color: $red;
+  padding: 1rem;
+}
+
+@media (max-width: 1120px) {
+  .grid,
+  .twoColumn {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .header,
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .grid,
+  .twoColumn {
+    grid-template-columns: 1fr;
+  }
+
+  .tableWrap {
+    overflow-x: auto;
+  }
+}

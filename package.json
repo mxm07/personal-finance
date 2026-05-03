@@ -1,0 +1,32 @@
+{
+  "name": "personal-finance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.100.6",
+    "@tanstack/react-router": "1.168.26",
+    "@tanstack/react-start": "1.167.52",
+    "better-sqlite3": "12.9.0",
+    "drizzle-orm": "0.45.2",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "zod": "4.4.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "25.6.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "sass": "1.99.0",
+    "typescript": "6.0.3",
+    "vite": "8.0.10",
+    "vitest": "4.1.5"
+  }
+}
