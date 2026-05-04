@@ -5,9 +5,17 @@ const transactionQuerySchema = z.object({
   search: z.string().optional(),
   categoryId: z.number().nullable().optional(),
   accountId: z.string().optional(),
+  connectionId: z.string().optional(),
   pending: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  minAmount: z.number().optional(),
+  maxAmount: z.number().optional(),
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
+  sortBy: z.string().optional(),
+  sortDir: z.string().optional(),
+  limit: z.number().optional(),
 }).optional()
 
 export const getDashboard = createServerFn({ method: 'GET' }).handler(async () => {
@@ -48,6 +56,22 @@ export const syncNow = createServerFn({ method: 'POST' }).handler(async () => {
   const { runManualSync } = await import('./server/actions')
   return runManualSync()
 })
+
+export const importSimpleFinHistory = createServerFn({ method: 'POST' }).handler(async () => {
+  const { runHistoricalSync } = await import('./server/actions')
+  return runHistoricalSync()
+})
+
+export const importTransactionsCsv = createServerFn({ method: 'POST' })
+  .inputValidator((data) => z.object({
+    fileName: z.string().min(1),
+    contents: z.string().min(1),
+    accountId: z.string().nullable().optional(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const { importCsvTransactions } = await import('./server/actions')
+    return importCsvTransactions(data)
+  })
 
 export const clearSimpleFin = createServerFn({ method: 'POST' }).handler(async () => {
   const { clearSimpleFinConnection } = await import('./server/actions')

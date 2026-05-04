@@ -1,22 +1,27 @@
-$ink: #17140f;
-$muted: #756c5b;
-$line: #ded5c3;
-$paper: #fbf4e5;
-$paper-strong: #fffaf0;
-$field: #f5ead4;
-$green: #236b46;
-$green-strong: #164a32;
-$red: #a73e2f;
-$amber: #9c6a18;
-$blue: #245b73;
-$shadow: 0 24px 60px rgba(57, 42, 20, 0.14);
-$radius-lg: 28px;
-$radius-md: 18px;
-$radius-sm: 12px;
+$ink: #151927;
+$muted: #657086;
+$muted-light: #9aa4b7;
+$line: #e5e9f2;
+$paper: #f6f8fc;
+$paper-strong: #ffffff;
+$field: #f8fafd;
+$app-bg: #f7f9fd;
+$accent: #6f57ff;
+$accent-strong: #4f46e5;
+$green: #1aa37a;
+$green-strong: #0f8c68;
+$red: #f15f64;
+$amber: #f3a63f;
+$blue: #4f7cff;
+$cyan: #30b6c9;
+$shadow: 0 14px 34px rgba(31, 41, 55, 0.08);
+$radius-lg: 0.9rem;
+$radius-md: 0.75rem;
+$radius-sm: 0.55rem;
 
 @mixin card {
-  background: rgba(255, 250, 240, 0.88);
-  border: 1px solid rgba($line, 0.9);
+  background: $paper-strong;
+  border: 1px solid $line;
   border-radius: $radius-lg;
   box-shadow: $shadow;
 }

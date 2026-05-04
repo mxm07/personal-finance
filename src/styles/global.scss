@@ -6,12 +6,9 @@
 
 html {
   min-height: 100%;
-  background:
-    radial-gradient(circle at 8% 10%, rgba(35, 107, 70, 0.18), transparent 28rem),
-    radial-gradient(circle at 92% 0%, rgba(156, 106, 24, 0.16), transparent 24rem),
-    linear-gradient(135deg, #f4e4c8 0%, #fff7e8 48%, #ead8b8 100%);
+  background: $app-bg;
   color: $ink;
-  font-family: "Aptos", "Segoe UI", sans-serif;
+  font-family: Inter, "Aptos", "Segoe UI", sans-serif;
 }
 
 body {

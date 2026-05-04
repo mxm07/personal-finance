@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
-import { claimSimpleFinToken, clearSimpleFin, getSetupData, syncNow } from '../server-functions'
+import {
+  claimSimpleFinToken,
+  clearSimpleFin,
+  getSetupData,
+  importSimpleFinHistory,
+  importTransactionsCsv,
+  syncNow,
+} from '../server-functions'
 import { formatDateTime } from '../lib/format'
 import styles from './page.module.scss'
 
@@ -14,6 +21,9 @@ function SetupPage() {
   const data = Route.useLoaderData()
   const [token, setToken] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [csvFiles, setCsvFiles] = useState<FileList | null>(null)
+  const [csvAccountId, setCsvAccountId] = useState('')
+  const [importingCsv, setImportingCsv] = useState(false)
 
   return (
     <section className={styles.page}>
@@ -67,11 +77,80 @@ function SetupPage() {
             <button className={styles.button} type="button" onClick={() => void syncNow().then(() => router.invalidate())}>
               Sync now
             </button>
+            <button
+              className={styles.secondaryButton}
+              type="button"
+              onClick={() => {
+                setMessage('Importing historical transactions...')
+                void importSimpleFinHistory()
+                  .then((result) => {
+                    setMessage(result.message)
+                    return router.invalidate()
+                  })
+                  .catch((error: unknown) => {
+                    setMessage(error instanceof Error ? error.message : 'Historical import failed.')
+                  })
+              }}
+            >
+              Import history
+            </button>
             <button className={styles.secondaryButton} type="button" onClick={() => void clearSimpleFin().then(() => router.invalidate())}>
               Clear credentials
             </button>
           </div>
         </div>
+      </div>
+
+      <div className={styles.card}>
+        <span className={styles.label}>CSV Import</span>
+        <p className={styles.subtle}>
+          Import Capital One or Discover CSV exports for history that is not available through SimpleFIN. Choose an account for Discover files; Capital One files are matched by card number when possible.
+        </p>
+        <form
+          className={styles.form}
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!csvFiles?.length) {
+              setMessage('Choose one or more CSV files first.')
+              return
+            }
+
+            setImportingCsv(true)
+            setMessage('Importing CSV transactions...')
+            void importCsvFiles([...csvFiles], csvAccountId || null)
+              .then((messages) => {
+                setMessage(messages.join(' '))
+                setCsvFiles(null)
+                return router.invalidate()
+              })
+              .catch((error: unknown) => {
+                setMessage(error instanceof Error ? error.message : 'CSV import failed.')
+              })
+              .finally(() => {
+                setImportingCsv(false)
+              })
+          }}
+        >
+          <input
+            key={csvFiles ? [...csvFiles].map((file) => file.name).join('|') : 'empty'}
+            accept=".csv,text/csv"
+            className={styles.field}
+            multiple
+            type="file"
+            onChange={(event) => setCsvFiles(event.target.files)}
+          />
+          <select className={styles.field} value={csvAccountId} onChange={(event) => setCsvAccountId(event.target.value)}>
+            <option value="">Auto-detect account</option>
+            {data.accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.connectionName ? `${account.connectionName} - ` : ''}{account.name}
+              </option>
+            ))}
+          </select>
+          <button className={styles.button} disabled={importingCsv} type="submit">
+            {importingCsv ? 'Importing...' : 'Import CSV'}
+          </button>
+        </form>
       </div>
 
       <div className={styles.tableWrap}>
@@ -101,4 +180,20 @@ function SetupPage() {
       </div>
     </section>
   )
+}
+
+async function importCsvFiles(files: File[], accountId: string | null) {
+  const messages: string[] = []
+  for (const file of files) {
+    const contents = await file.text()
+    const result = await importTransactionsCsv({
+      data: {
+        fileName: file.name,
+        contents,
+        accountId,
+      },
+    })
+    messages.push(`${file.name}: ${result.message}`)
+  }
+  return messages
 }

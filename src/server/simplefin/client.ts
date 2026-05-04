@@ -45,13 +45,19 @@ export async function claimAccessUrl(tokenOrUrl: string) {
   return accessUrl
 }
 
-export async function fetchAccountSet(accessUrl: string, startDate?: number) {
+export async function fetchAccountSet(accessUrl: string, startDate?: number, endDate?: number, accountIds: string[] = []) {
   const { headers, root } = getAccessRequestParts(accessUrl)
   const url = new URL(`${root}/accounts`)
   url.searchParams.set('version', '2')
   url.searchParams.set('pending', '1')
   if (startDate && startDate > 0) {
     url.searchParams.set('start-date', String(startDate))
+  }
+  if (endDate && endDate > 0) {
+    url.searchParams.set('end-date', String(endDate))
+  }
+  for (const accountId of accountIds) {
+    url.searchParams.append('account', accountId)
   }
 
   const response = await fetch(url, { headers })

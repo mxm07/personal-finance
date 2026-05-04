@@ -1,5 +1,12 @@
+import { useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { getDashboard, syncNow } from '../server-functions'
+import {
+  TimeRangePicker,
+  getDefaultTimeRange,
+  getTimeRangeBounds,
+  type TimeRangeValue,
+} from '../components/time-range-selector'
 import { formatDate, formatDateTime, formatMoney } from '../lib/format'
 import styles from './page.module.scss'
 
@@ -10,15 +17,32 @@ export const Route = createFileRoute('/')({
 
 function OverviewPage() {
   const data = Route.useLoaderData()
+  const [incomeRange, setIncomeRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
+  const [spendingRange, setSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
+  const [topSpendingRange, setTopSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
+  const incomeChartData = buildChartData(data.chartTransactions, incomeRange)
+  const spendingChartData = buildChartData(data.chartTransactions, spendingRange)
+  const topSpendingChartData = buildChartData(data.chartTransactions, topSpendingRange)
   const primaryBalance = data.balances[0]
   const primaryFlow = data.cashFlow[0]
+  const spendingRows = spendingChartData.spendingByCategory.slice(0, 6).map((item, index) => ({
+    ...item,
+    color: palette[index % palette.length],
+  }))
+  const topSpendingRows = topSpendingChartData.spendingByCategory.slice(0, 5)
+  const accountBalanceRows = data.accountBalances.slice(0, 6)
+  const today = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date())
 
   return (
     <section className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.kicker}>Month to date</p>
-          <h1 className={styles.heading}>Money map</h1>
+          <h1 className={styles.heading}>Financial overview</h1>
+          <p className={styles.kicker}>Here is your financial overview for {today}</p>
         </div>
         <SyncButton />
       </header>
@@ -29,76 +53,262 @@ function OverviewPage() {
         </div>
       ) : null}
 
-      <div className={styles.grid}>
-        <Metric label="Net worth" value={primaryBalance ? formatMoney(primaryBalance.netWorth, primaryBalance.currency) : 'No balances'} />
-        <Metric label="Money in" value={primaryFlow ? formatMoney(primaryFlow.moneyIn, primaryFlow.currency) : '$0.00'} tone="positive" />
-        <Metric label="Money out" value={primaryFlow ? formatMoney(primaryFlow.moneyOut, primaryFlow.currency) : '$0.00'} tone="negative" />
-        <Metric label="Net cash flow" value={primaryFlow ? formatMoney(primaryFlow.net, primaryFlow.currency) : '$0.00'} tone={primaryFlow?.net && primaryFlow.net < 0 ? 'negative' : 'positive'} />
+      <div className={styles.dashboardGrid}>
+        <Metric
+          label="Net Worth"
+          value={primaryBalance ? formatMoney(primaryBalance.netWorth, primaryBalance.currency) : 'No balances'}
+          tone={primaryBalance?.netWorth && primaryBalance.netWorth < 0 ? 'negative' : 'positive'}
+          detail={data.accounts.length ? `${data.accounts.length} synced accounts` : 'No accounts synced'}
+        />
+        <Metric
+          label="Total Assets"
+          value={primaryBalance ? formatMoney(primaryBalance.assets, primaryBalance.currency) : '$0.00'}
+          tone="positive"
+          detail="Current positive balances"
+        />
+        <Metric
+          label="Total Liabilities"
+          value={primaryBalance ? formatMoney(Math.abs(primaryBalance.liabilities), primaryBalance.currency) : '$0.00'}
+          tone="negative"
+          detail="Current negative balances"
+        />
+        <Metric
+          label="Monthly Cash Flow"
+          value={primaryFlow ? formatMoney(primaryFlow.net, primaryFlow.currency) : '$0.00'}
+          tone={primaryFlow?.net && primaryFlow.net < 0 ? 'negative' : 'positive'}
+          detail="Posted transactions this month"
+        />
       </div>
 
-      <div className={styles.twoColumn}>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Account</th>
-                <th>Category</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recentTransactions.map((transaction) => (
-                <tr key={transaction.id}>
-                  <td>{formatDate(transaction.postedAt)}</td>
-                  <td>
-                    {transaction.description}
-                    {transaction.pending ? <span className={styles.pill}>Pending</span> : null}
-                  </td>
-                  <td>{transaction.accountName}</td>
-                  <td>{transaction.categoryName ?? 'Uncategorized'}</td>
-                  <td className={transaction.amount < 0 ? styles.negative : styles.positive}>
-                    {formatMoney(transaction.amount, transaction.currency)}
-                  </td>
-                </tr>
-              ))}
-              {!data.recentTransactions.length ? (
-                <tr><td colSpan={5}>No transactions synced yet.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+      <div className={styles.panelGrid}>
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Income vs Expenses</h2>
+            <TimeRangePicker value={incomeRange} onChange={setIncomeRange} />
+          </div>
+          <div className={styles.legend}>
+            <span className={styles.legendItem}><span className={styles.dot} style={{ background: '#1aa37a' }} />Income</span>
+            <span className={styles.legendItem}><span className={styles.dot} style={{ background: '#6f57ff' }} />Expenses</span>
+          </div>
+          <LineChart points={incomeChartData.dailyCashFlow.points} />
         </div>
 
-        <aside className={styles.stack}>
-          <div className={styles.card}>
-            <span className={styles.label}>Latest sync</span>
-            <p>{data.status.latestSync ? `${data.status.latestSync.status} at ${formatDateTime(data.status.latestSync.finishedAt ?? data.status.latestSync.startedAt)}` : 'No sync has run yet.'}</p>
-            {data.status.latestSync?.message ? <p className={styles.subtle}>{data.status.latestSync.message}</p> : null}
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Spending by Category</h2>
+            <TimeRangePicker value={spendingRange} onChange={setSpendingRange} />
           </div>
-          <div className={styles.card}>
-            <span className={styles.label}>Accounts</span>
-            {data.accounts.slice(0, 6).map((account) => (
-              <p key={account.id}>
-                <strong>{account.name}</strong><br />
-                <span className={styles.subtle}>{account.connectionName} · {formatMoney(account.balance, account.currency)}</span>
-              </p>
+          <div className={styles.donutWrap}>
+            <DonutChart rows={spendingRows} totalLabel={formatMoney(spendingChartData.moneyOut, spendingChartData.currency)} />
+            <div className={styles.categoryList}>
+              {spendingRows.map((item) => (
+                <div className={styles.categoryRow} key={item.name}>
+                  <span className={styles.dot} style={{ background: item.color }} />
+                  <span className={styles.rowTitle}>{item.name}</span>
+                  <span>{formatMoney(item.amount, item.currency)}</span>
+                  <span className={styles.rowMeta}>{item.percent}%</span>
+                </div>
+              ))}
+              {!spendingRows.length ? <p className={styles.subtle}>No spending synced yet.</p> : null}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Top Spending</h2>
+            <TimeRangePicker value={topSpendingRange} onChange={setTopSpendingRange} />
+          </div>
+          <div className={styles.budgetList}>
+            {topSpendingRows.map((item) => (
+              <div className={styles.budgetRow} key={item.name}>
+                <span className={styles.rowTitle}>{item.name}</span>
+                <span className={styles.rowMeta}>{formatMoney(item.amount, item.currency)} · {item.percent}%</span>
+                <span className={styles.budgetTrack}><span className={styles.budgetFill} style={{ width: `${item.percent}%` }} /></span>
+              </div>
+            ))}
+            {!topSpendingRows.length ? <p className={styles.subtle}>No category activity yet.</p> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.lowerGrid}>
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Accounts</h2>
+            <Link to="/accounts" className={styles.selectPill}>View All</Link>
+          </div>
+          <div className={styles.budgetList}>
+            {data.accounts.slice(0, 5).map((account) => (
+              <div className={styles.budgetRow} key={account.id}>
+                <span className={styles.rowTitle}>{account.name}</span>
+                <span>{formatMoney(account.balance, account.currency)}</span>
+                <span className={styles.rowMeta}>{account.connectionName}</span>
+              </div>
             ))}
             {!data.accounts.length ? <p className={styles.subtle}>No accounts synced yet.</p> : null}
           </div>
-        </aside>
+        </div>
+
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Recent Transactions</h2>
+            <Link to="/transactions" className={styles.selectPill}>View All</Link>
+          </div>
+          <div className={styles.transactionList}>
+            {data.recentTransactions.slice(0, 5).map((transaction, index) => (
+              <div className={styles.transactionRow} key={transaction.id}>
+                <span className={styles.merchantIcon} style={{ background: palette[index % palette.length] }}>
+                  {transaction.description.slice(0, 1).toUpperCase()}
+                </span>
+                <span>
+                  <span className={styles.rowTitle}>{transaction.description}</span>
+                  <span className={styles.rowMeta}>{transaction.categoryName ?? 'Uncategorized'} · {formatDate(transaction.postedAt)}</span>
+                </span>
+                <span className={transaction.amount < 0 ? styles.negative : styles.positive}>
+                  {formatMoney(transaction.amount, transaction.currency)}
+                </span>
+              </div>
+            ))}
+            {!data.recentTransactions.length ? <p className={styles.subtle}>No transactions synced yet.</p> : null}
+          </div>
+        </div>
+
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Sync Status</h2>
+            <Link to="/setup" className={styles.selectPill}>Setup</Link>
+          </div>
+          <div className={styles.billList}>
+            <div className={styles.billRow}>
+              <span className={styles.merchantIcon} style={{ background: '#4f7cff' }}>S</span>
+              <span>
+                <span className={styles.rowTitle}>{data.status.latestSync?.status ?? 'No sync'}</span>
+                <span className={styles.rowMeta}>
+                  {data.status.latestSync ? formatDateTime(data.status.latestSync.finishedAt ?? data.status.latestSync.startedAt) : 'Connect SimpleFIN'}
+                </span>
+              </span>
+              <span className={data.status.connected ? styles.positive : styles.negative}>{data.status.connected ? 'Live' : 'Off'}</span>
+            </div>
+            {data.status.latestSync?.message ? <p className={styles.subtle}>{data.status.latestSync.message}</p> : null}
+          </div>
+        </div>
+
+        <div className={styles.chartCard}>
+          <div className={styles.chartHeader}>
+            <h2 className={styles.chartTitle}>Balance by Account</h2>
+            <span className={styles.selectPill}>Current</span>
+          </div>
+          <div className={styles.budgetList}>
+            {accountBalanceRows.map((account) => (
+              <div className={styles.budgetRow} key={account.id}>
+                <span className={styles.rowTitle}>{account.name}</span>
+                <span className={account.balance < 0 ? styles.negative : styles.positive}>{formatMoney(account.balance, account.currency)}</span>
+                <span className={styles.budgetTrack}>
+                  <span
+                    className={`${styles.budgetFill} ${account.balance < 0 ? styles.negativeFill : ''}`}
+                    style={{ width: `${account.percent}%` }}
+                  />
+                </span>
+              </div>
+            ))}
+            {!accountBalanceRows.length ? <p className={styles.subtle}>No accounts synced yet.</p> : null}
+          </div>
+        </div>
       </div>
     </section>
   )
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'negative' }) {
+function DonutChart({
+  rows,
+  totalLabel,
+}: {
+  rows: Array<{ name: string; amount: number; currency: string; percent: number; color: string }>
+  totalLabel: string
+}) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const radius = 58
+  const circumference = 2 * Math.PI * radius
+  const total = rows.reduce((sum, row) => sum + row.amount, 0)
+  let offset = 0
+  const active = activeIndex == null ? null : rows[activeIndex]
+  const activePosition = activeIndex == null ? null : getDonutTooltipPosition(rows, activeIndex)
+
+  return (
+    <div className={styles.donut}>
+      <svg className={styles.donutSvg} viewBox="0 0 180 180" role="img" aria-label="Spending by category">
+        <circle cx="90" cy="90" r={radius} fill="none" stroke="#eef2f8" strokeWidth="28" />
+        {rows.map((row, index) => {
+          const length = total ? (row.amount / total) * circumference : 0
+          const dashOffset = -offset
+          offset += length
+
+          return (
+            <circle
+              key={row.name}
+              cx="90"
+              cy="90"
+              r={radius}
+              fill="none"
+              stroke={row.color}
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={dashOffset}
+              strokeWidth="28"
+              tabIndex={0}
+              transform="rotate(-90 90 90)"
+              className={styles.donutSector}
+              onBlur={() => setActiveIndex(null)}
+              onFocus={() => setActiveIndex(index)}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseLeave={() => setActiveIndex(null)}
+            />
+          )
+        })}
+      </svg>
+      <div className={styles.donutCenter}>
+        <strong>{totalLabel}</strong>
+        <span>Total</span>
+      </div>
+      {active && activePosition ? (
+        <div
+          className={styles.donutTooltip}
+          style={{
+            left: `${activePosition.x}%`,
+            top: `${activePosition.y}%`,
+          }}
+        >
+          <strong>{active.name}</strong>
+          <span>{formatMoney(active.amount, active.currency)} · {active.percent}%</span>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function Metric({
+  label,
+  value,
+  tone,
+  detail,
+}: {
+  label: string
+  value: string
+  tone?: 'positive' | 'negative'
+  detail: string
+}) {
   return (
     <div className={styles.metric}>
-      <span className={styles.label}>{label}</span>
-      <span className={`${styles.value} ${tone === 'positive' ? styles.positive : ''} ${tone === 'negative' ? styles.negative : ''}`}>
-        {value}
-      </span>
+      <div className={styles.metricTop}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.rowMeta}>i</span>
+      </div>
+      <div className={styles.metricBody}>
+        <span className={styles.value}>{value}</span>
+        <span className={`${styles.trend} ${tone === 'negative' ? styles.negative : styles.positive}`}>
+          {detail}
+        </span>
+      </div>
     </div>
   )
 }
@@ -118,3 +328,291 @@ function SyncButton() {
     </button>
   )
 }
+
+type ChartTransaction = {
+  postedAt: number
+  amount: number
+  currency: string
+  pending: boolean
+  categoryName: string | null
+}
+
+function buildChartData(transactions: ChartTransaction[], range: TimeRangeValue) {
+  const bounds = getTimeRangeBounds(range)
+  const rows = transactions.filter((transaction) => (
+    !transaction.pending
+    && transaction.postedAt >= bounds.startEpoch
+    && transaction.postedAt <= bounds.endEpoch
+  ))
+  const currency = rows[0]?.currency ?? transactions[0]?.currency ?? 'USD'
+  const dailyCashFlow = buildRangeCashFlow(rows, bounds.startEpoch, bounds.endEpoch)
+  const spendingByCategory = buildRangeSpendingByCategory(rows)
+  const moneyOut = rows.reduce((sum, row) => row.amount < 0 ? sum + Math.abs(row.amount) : sum, 0)
+
+  return {
+    currency,
+    dailyCashFlow,
+    spendingByCategory,
+    moneyOut,
+  }
+}
+
+function buildRangeCashFlow(rows: ChartTransaction[], startEpoch: number, endEpoch: number) {
+  const start = startOfDay(new Date(startEpoch * 1000))
+  const end = startOfDay(new Date(endEpoch * 1000))
+  const useMonthlyBuckets = differenceInDays(start, end) > 92
+  const currency = rows[0]?.currency ?? 'USD'
+  const buckets = new Map<string, { date: string; moneyIn: number; moneyOut: number; net: number; currency: string }>()
+  const cursor = new Date(start)
+
+  while (cursor <= end) {
+    const key = useMonthlyBuckets ? toMonthKey(cursor) : toDateKey(cursor)
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        date: key,
+        moneyIn: 0,
+        moneyOut: 0,
+        net: 0,
+        currency,
+      })
+    }
+
+    if (useMonthlyBuckets) {
+      cursor.setMonth(cursor.getMonth() + 1, 1)
+    } else {
+      cursor.setDate(cursor.getDate() + 1)
+    }
+  }
+
+  for (const row of rows) {
+    const key = useMonthlyBuckets ? toMonthKey(new Date(row.postedAt * 1000)) : toDateKey(new Date(row.postedAt * 1000))
+    const bucket = buckets.get(key)
+    if (!bucket) {
+      continue
+    }
+
+    if (row.amount >= 0) {
+      bucket.moneyIn += row.amount
+    } else {
+      bucket.moneyOut += Math.abs(row.amount)
+    }
+    bucket.net += row.amount
+  }
+
+  return {
+    bucket: useMonthlyBuckets ? 'month' : 'day',
+    points: [...buckets.values()],
+  }
+}
+
+function buildRangeSpendingByCategory(rows: ChartTransaction[]) {
+  const totals = new Map<string, { name: string; amount: number; currency: string }>()
+
+  for (const row of rows) {
+    if (row.amount >= 0) {
+      continue
+    }
+
+    const name = row.categoryName ?? 'Uncategorized'
+    const current = totals.get(name) ?? { name, amount: 0, currency: row.currency }
+    current.amount += Math.abs(row.amount)
+    totals.set(name, current)
+  }
+
+  const sorted = [...totals.values()].sort((a, b) => b.amount - a.amount)
+  const total = sorted.reduce((sum, row) => sum + row.amount, 0)
+
+  return sorted.map((row) => ({
+    ...row,
+    percent: total ? Math.round((row.amount / total) * 1000) / 10 : 0,
+  }))
+}
+
+function LineChart({
+  points,
+}: {
+  points: Array<{ date: string; moneyIn: number; moneyOut: number; net: number; currency?: string }>
+}) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const income = points.map((point) => point.moneyIn)
+  const expenses = points.map((point) => point.moneyOut)
+  const hasActivity = points.some((point) => point.moneyIn || point.moneyOut)
+  const maxValue = Math.max(...income, ...expenses, 1)
+  const chartPoints = points.map((point, index) => ({
+    ...point,
+    incomePoint: getPoint(point.moneyIn, index, points.length, 640, 220, maxValue),
+    expensePoint: getPoint(point.moneyOut, index, points.length, 640, 220, maxValue),
+  }))
+  const active = activeIndex == null ? null : chartPoints[activeIndex]
+
+  return (
+    <svg
+      className={styles.lineChart}
+      viewBox="0 0 640 220"
+      role="img"
+      aria-label="Income and expense trend"
+      onMouseLeave={() => setActiveIndex(null)}
+      onPointerMove={(event) => {
+        const svg = event.currentTarget
+        const matrix = svg.getScreenCTM()
+        if (!matrix) {
+          return
+        }
+        const point = svg.createSVGPoint()
+        point.x = event.clientX
+        point.y = event.clientY
+        const cursor = point.matrixTransform(matrix.inverse())
+        setActiveIndex(getNearestPointIndex(cursor.x, points.length, 640))
+      }}
+    >
+      <defs>
+        <linearGradient id="incomeFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#1aa37a" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#1aa37a" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="expenseFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#6f57ff" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#6f57ff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[40, 85, 130, 175].map((y) => (
+        <line key={y} x1="0" x2="640" y1={y} y2={y} stroke="#e5e9f2" strokeDasharray="4 6" />
+      ))}
+      {hasActivity ? (
+        <>
+          <path d={areaPath(income, 640, 220, maxValue)} fill="url(#incomeFill)" />
+          <path d={areaPath(expenses, 640, 220, maxValue)} fill="url(#expenseFill)" />
+          <path d={linePath(income, 640, 220, maxValue)} fill="none" stroke="#1aa37a" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          <path d={linePath(expenses, 640, 220, maxValue)} fill="none" stroke="#6f57ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          {active ? (
+            <g>
+              <line x1={active.incomePoint.x} x2={active.incomePoint.x} y1="18" y2="208" stroke="#cbd5e1" strokeDasharray="4 5" />
+              <circle cx={active.incomePoint.x} cy={active.incomePoint.y} r="6" fill="#1aa37a" stroke="white" strokeWidth="3" />
+              <circle cx={active.expensePoint.x} cy={active.expensePoint.y} r="6" fill="#6f57ff" stroke="white" strokeWidth="3" />
+              <ChartTooltip point={active} />
+            </g>
+          ) : null}
+        </>
+      ) : (
+        <text x="320" y="116" fill="#657086" fontSize="16" textAnchor="middle">No posted activity this month</text>
+      )}
+    </svg>
+  )
+}
+
+function ChartTooltip({ point }: {
+  point: {
+    date: string
+    moneyIn: number
+    moneyOut: number
+    net: number
+    currency?: string
+    incomePoint: { x: number; y: number }
+  }
+}) {
+  const width = 168
+  const x = Math.min(Math.max(point.incomePoint.x - width / 2, 8), 640 - width - 8)
+  const y = point.incomePoint.y > 92 ? point.incomePoint.y - 86 : point.incomePoint.y + 18
+
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <rect width={width} height="72" rx="10" fill="#151927" opacity="0.96" />
+      <text x="12" y="18" fill="white" fontSize="12" fontWeight="700">{formatChartBucketLabel(point.date)}</text>
+      <text x="12" y="38" fill="#9ee6c8" fontSize="11">Income: {formatMoney(point.moneyIn, point.currency ?? 'USD')}</text>
+      <text x="12" y="54" fill="#c8beff" fontSize="11">Expenses: {formatMoney(point.moneyOut, point.currency ?? 'USD')}</text>
+      <text x="12" y="68" fill="rgba(255,255,255,0.78)" fontSize="11">Net: {formatMoney(point.net, point.currency ?? 'USD')}</text>
+    </g>
+  )
+}
+
+function linePath(values: number[], width = 640, height = 220, maxValue?: number) {
+  const points = getPoints(values, width, height, maxValue)
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+}
+
+function areaPath(values: number[], width = 640, height = 220, maxValue?: number) {
+  const points = getPoints(values, width, height, maxValue)
+  const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  return `${line} L ${width} ${height} L 0 ${height} Z`
+}
+
+function getPoints(values: number[], width: number, height: number, maxValue?: number) {
+  const max = maxValue ?? Math.max(...values, 1)
+  return values.map((value, index) => getPoint(value, index, values.length, width, height, max))
+}
+
+function getPoint(value: number, index: number, count: number, width: number, height: number, maxValue?: number) {
+  const max = maxValue ?? Math.max(value, 1)
+  const step = width / Math.max(1, count - 1)
+
+  return {
+    x: Math.round(index * step),
+    y: Math.round(height - 12 - (value / max) * (height - 28)),
+  }
+}
+
+function getNearestPointIndex(x: number, count: number, width: number) {
+  if (count <= 1) {
+    return 0
+  }
+
+  const step = width / (count - 1)
+  return Math.min(count - 1, Math.max(0, Math.round(x / step)))
+}
+
+function formatChartBucketLabel(value: string) {
+  const parts = value.split('-').map(Number)
+  const date = parts.length === 2
+    ? new Date(parts[0], (parts[1] ?? 1) - 1, 1)
+    : new Date(parts[0], (parts[1] ?? 1) - 1, parts[2] ?? 1)
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: parts.length === 2 ? undefined : 'numeric',
+    year: 'numeric',
+  }).format(date)
+}
+
+function getDonutTooltipPosition(rows: Array<{ amount: number }>, index: number) {
+  const total = rows.reduce((sum, row) => sum + row.amount, 0)
+  if (!total) {
+    return null
+  }
+
+  const before = rows.slice(0, index).reduce((sum, row) => sum + row.amount, 0)
+  const midpoint = (before + rows[index].amount / 2) / total
+  const angle = midpoint * Math.PI * 2 - Math.PI / 2
+  const radius = 40
+
+  return {
+    x: 50 + Math.cos(angle) * radius,
+    y: 50 + Math.sin(angle) * radius,
+  }
+}
+
+function differenceInDays(start: Date, end: Date) {
+  return Math.floor((end.getTime() - start.getTime()) / 86_400_000)
+}
+
+function startOfDay(date: Date) {
+  const copy = new Date(date)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function toMonthKey(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+
+  return `${year}-${month}`
+}
+
+const palette = ['#4f7cff', '#1aa37a', '#30b6c9', '#f3a63f', '#ff8a8f', '#f15f64']

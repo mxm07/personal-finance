@@ -1,93 +1,253 @@
 @use '../styles/tokens' as *;
 
 .shell {
+  background: $app-bg;
   display: grid;
-  grid-template-columns: 18rem minmax(0, 1fr);
+  grid-template-columns: 17rem minmax(0, 1fr);
   min-height: 100vh;
 }
 
 .sidebar {
-  border-right: 1px solid rgba($line, 0.9);
-  padding: 2rem;
-  background: rgba(251, 244, 229, 0.58);
-  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.84);
+  border-right: 1px solid $line;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 2rem 1.35rem;
 }
 
 .brand {
-  display: grid;
-  gap: 0.25rem;
-  margin-bottom: 2.25rem;
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0 0.25rem;
 }
 
-.eyebrow {
-  color: $muted;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.logoMark {
+  align-items: center;
+  background: linear-gradient(135deg, #4568ff 0%, #7c4dff 100%);
+  border-radius: 0.7rem 0.7rem 0.7rem 0.25rem;
+  color: white;
+  display: inline-flex;
+  font-size: 1rem;
+  font-weight: 900;
+  height: 2.1rem;
+  justify-content: center;
+  width: 2.1rem;
 }
 
 .title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  color: $ink;
+  font-size: 1.35rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
 }
 
 .nav {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .navLink {
-  border: 1px solid transparent;
-  border-radius: 999px;
+  align-items: center;
+  border-radius: 0.7rem;
   color: $muted;
-  padding: 0.85rem 1rem;
+  display: flex;
+  font-size: 0.94rem;
+  font-weight: 700;
+  gap: 0.75rem;
+  min-height: 2.95rem;
+  padding: 0 0.85rem;
   text-decoration: none;
   transition: 160ms ease;
 }
 
 .navLink:hover,
 .active {
-  background: $paper-strong;
-  border-color: $line;
-  color: $ink;
-  transform: translateX(0.2rem);
+  background: #f0ebff;
+  color: $accent;
+}
+
+.navIcon {
+  align-items: center;
+  color: inherit;
+  display: inline-flex;
+  height: 1.25rem;
+  justify-content: center;
+  width: 1.25rem;
+}
+
+.navIcon svg,
+.sidebarCardIcon svg,
+.search svg,
+.iconButton svg {
+  display: block;
+  stroke-width: 2.3;
+}
+
+.sidebarCard {
+  background: linear-gradient(135deg, #34207c 0%, #6d4dff 100%);
+  border-radius: 0.9rem;
+  box-shadow: 0 18px 42px rgba(74, 61, 160, 0.22);
+  color: white;
+  display: grid;
+  gap: 0.55rem;
+  line-height: 1.45;
+  margin-top: auto;
+  padding: 1.05rem;
+}
+
+.sidebarCard span:last-child {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.82rem;
+}
+
+.sidebarCardIcon {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  display: inline-flex;
+  height: 1.8rem;
+  justify-content: center;
+  width: 1.8rem;
 }
 
 .main {
   min-width: 0;
-  padding: 2rem;
+  padding: 1.9rem 2rem 2rem;
 }
 
-@media (max-width: 860px) {
+.topbar {
+  align-items: center;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(18rem, 28rem) auto auto max-content;
+  justify-content: end;
+  margin-bottom: 1.6rem;
+}
+
+.search {
+  align-items: center;
+  background: white;
+  border: 1px solid $line;
+  border-radius: 0.65rem;
+  color: $muted-light;
+  display: flex;
+  gap: 0.55rem;
+  min-height: 2.7rem;
+  padding: 0 0.85rem;
+}
+
+.search input {
+  background: transparent;
+  border: 0;
+  color: $ink;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.iconButton {
+  @include button-reset;
+  align-items: center;
+  background: transparent;
+  border-radius: 999px;
+  color: $muted;
+  display: inline-flex;
+  font-weight: 850;
+  height: 2.4rem;
+  justify-content: center;
+  position: relative;
+  width: 2.4rem;
+}
+
+.iconButton:first-of-type::after {
+  background: $red;
+  border: 2px solid $app-bg;
+  border-radius: 999px;
+  content: "";
+  height: 0.55rem;
+  position: absolute;
+  right: 0.45rem;
+  top: 0.45rem;
+  width: 0.55rem;
+}
+
+.profile {
+  align-items: center;
+  color: $ink;
+  display: flex;
+  font-size: 0.92rem;
+  font-weight: 800;
+  gap: 0.65rem;
+  white-space: nowrap;
+}
+
+.avatar {
+  align-items: center;
+  background: linear-gradient(135deg, #173f5f, #37a174);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  height: 2.3rem;
+  justify-content: center;
+  width: 2.3rem;
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
   .shell {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
+    border-bottom: 1px solid $line;
+    border-right: 0;
+    padding: 1rem;
     position: sticky;
     top: 0;
     z-index: 10;
-    padding: 1rem;
   }
 
-  .brand {
-    margin-bottom: 1rem;
+  .brand,
+  .sidebarCard {
+    display: none;
   }
 
   .nav {
     display: flex;
+    gap: 0.4rem;
     overflow-x: auto;
-    padding-bottom: 0.25rem;
   }
 
   .navLink {
     flex: 0 0 auto;
+    min-height: 2.55rem;
   }
 
   .main {
     padding: 1rem;
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    justify-content: stretch;
+  }
+
+  .profile {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .search input::placeholder {
+    color: transparent;
   }
 }

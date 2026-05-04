@@ -18,11 +18,11 @@ describe('SimpleFIN client', () => {
     } as Response))
     vi.stubGlobal('fetch', fetchMock)
 
-    await fetchAccountSet('https://demo:p%40ss@example.com/simplefin/', 123)
+    await fetchAccountSet('https://demo:p%40ss@example.com/simplefin/', 123, 456, ['checking', 'savings'])
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit]
-    expect(url.toString()).toBe('https://example.com/simplefin/accounts?version=2&pending=1&start-date=123')
+    expect(url.toString()).toBe('https://example.com/simplefin/accounts?version=2&pending=1&start-date=123&end-date=456&account=checking&account=savings')
     expect(init.headers).toBeInstanceOf(Headers)
     expect((init.headers as Headers).get('Authorization')).toBe(`Basic ${Buffer.from('demo:p@ss').toString('base64')}`)
   })

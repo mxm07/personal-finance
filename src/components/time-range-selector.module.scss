@@ -1,0 +1,130 @@
+@use '../styles/tokens' as *;
+
+.picker {
+  position: relative;
+}
+
+.trigger {
+  @include button-reset;
+  align-items: center;
+  background: white;
+  border: 1px solid $line;
+  border-radius: 0.55rem;
+  color: $muted;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 850;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.65rem;
+  transition: 140ms ease;
+  white-space: nowrap;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  background: #f0ebff;
+  border-color: rgba($accent, 0.24);
+  color: $accent;
+}
+
+.trigger svg {
+  display: block;
+  stroke-width: 2.3;
+}
+
+.popover {
+  background: white;
+  border: 1px solid $line;
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.16);
+  display: grid;
+  gap: 0.8rem;
+  min-width: 19rem;
+  padding: 0.85rem;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 20;
+}
+
+.popoverHeader {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.popoverHeader strong {
+  color: $ink;
+  font-size: 0.9rem;
+}
+
+.popoverHeader span {
+  color: $muted;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.segments {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segment {
+  @include button-reset;
+  background: $field;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  color: $muted;
+  font-size: 0.78rem;
+  font-weight: 850;
+  min-height: 2.35rem;
+  padding: 0 0.7rem;
+  text-align: left;
+  transition: 140ms ease;
+  white-space: nowrap;
+}
+
+.segment:hover {
+  color: $ink;
+}
+
+.active {
+  background: #f0ebff;
+  border-color: rgba($accent, 0.18);
+  color: $accent;
+}
+
+.customFields {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.customFields label {
+  color: $muted;
+  display: grid;
+  font-size: 0.72rem;
+  font-weight: 850;
+  gap: 0.3rem;
+}
+
+.dateField {
+  background: white;
+  border: 1px solid $line;
+  border-radius: 0.62rem;
+  color: $ink;
+  font-size: 0.78rem;
+  font-weight: 750;
+  min-height: 2.45rem;
+  outline-color: rgba($accent, 0.35);
+  padding: 0 0.65rem;
+}
+
+@media (max-width: 760px) {
+  .popover {
+    left: auto;
+    max-width: min(90vw, 22rem);
+    min-width: min(90vw, 19rem);
+    right: 0;
+  }
+}

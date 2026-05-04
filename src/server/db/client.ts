@@ -59,6 +59,7 @@ function migrate(database: Database.Database) {
       balance REAL NOT NULL,
       available_balance REAL,
       balance_date INTEGER NOT NULL,
+      history_cursor INTEGER,
       updated_at INTEGER NOT NULL,
       UNIQUE(connection_id, simplefin_id)
     );
@@ -99,6 +100,11 @@ function migrate(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS transactions_category_id_idx ON transactions(category_id);
   `)
 
+  addColumnIfMissing(database, 'transactions', 'category_confidence', 'REAL')
+  addColumnIfMissing(database, 'transactions', 'category_reason', 'TEXT')
+  addColumnIfMissing(database, 'transactions', 'normalized_merchant', 'TEXT')
+  addColumnIfMissing(database, 'accounts', 'history_cursor', 'INTEGER')
+
   const now = Math.floor(Date.now() / 1000)
   const defaults = [
     ['Income', '#236b46'],
@@ -108,6 +114,11 @@ function migrate(database: Database.Database) {
     ['Transportation', '#6b5b95'],
     ['Utilities', '#537a5a'],
     ['Healthcare', '#b35c44'],
+    ['Shopping', '#4f7cff'],
+    ['Entertainment', '#6f57ff'],
+    ['Travel', '#30b6c9'],
+    ['Personal Care', '#b35c44'],
+    ['Fees', '#a73e2f'],
     ['Transfers', '#756c5b'],
     ['Uncategorized', '#9c6a18'],
   ] as const
@@ -115,5 +126,12 @@ function migrate(database: Database.Database) {
   const stmt = database.prepare('INSERT OR IGNORE INTO categories (name, color, created_at) VALUES (?, ?, ?)')
   for (const [name, color] of defaults) {
     stmt.run(name, color, now)
+  }
+}
+
+function addColumnIfMissing(database: Database.Database, table: string, column: string, definition: string) {
+  const columns = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+  if (!columns.some((existing) => existing.name === column)) {
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
   }
 }

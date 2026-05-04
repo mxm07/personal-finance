@@ -34,6 +34,7 @@ export const accounts = sqliteTable('accounts', {
   balance: real('balance').notNull(),
   availableBalance: real('available_balance'),
   balanceDate: integer('balance_date').notNull(),
+  historyCursor: integer('history_cursor'),
   updatedAt: integer('updated_at').notNull(),
 }, (table) => ({
   accountIdentity: uniqueIndex('accounts_connection_simplefin_unique').on(table.connectionId, table.simplefinId),
@@ -65,6 +66,9 @@ export const transactions = sqliteTable('transactions', {
   pending: integer('pending', { mode: 'boolean' }).notNull(),
   categoryId: integer('category_id').references(() => categories.id),
   categorySource: text('category_source'),
+  categoryConfidence: real('category_confidence'),
+  categoryReason: text('category_reason'),
+  normalizedMerchant: text('normalized_merchant'),
   raw: text('raw').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (table) => ({
