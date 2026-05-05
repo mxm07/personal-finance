@@ -1,6 +1,7 @@
 @use '../styles/tokens' as *;
 
 .picker {
+  min-width: 0;
   position: relative;
 }
 
@@ -40,7 +41,7 @@
   box-shadow: 0 18px 42px rgba(31, 41, 55, 0.16);
   display: grid;
   gap: 0.8rem;
-  min-width: 19rem;
+  min-width: min(19rem, calc(100vw - 1.5rem));
   padding: 0.85rem;
   position: absolute;
   right: 0;
@@ -118,13 +119,31 @@
   min-height: 2.45rem;
   outline-color: rgba($accent, 0.35);
   padding: 0 0.65rem;
+  width: 100%;
 }
 
 @media (max-width: 760px) {
   .popover {
     left: auto;
-    max-width: min(90vw, 22rem);
-    min-width: min(90vw, 19rem);
+    max-width: min(calc(100vw - 1.5rem), 22rem);
+    min-width: min(calc(100vw - 1.5rem), 19rem);
     right: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .trigger {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .popover {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+
+  .segments {
+    grid-template-columns: 1fr;
   }
 }

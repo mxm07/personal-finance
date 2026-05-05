@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { categorizeTransaction, normalizeMerchant } from './categorization'
-import type { Category, CategoryRule } from '../db/schema'
+import type { CategoryRecord, CategoryRuleRecord } from '../storage/store'
 
 const categories = [
   category(1, 'Income'),
@@ -21,7 +21,7 @@ const categories = [
 
 describe('local transaction categorization', () => {
   it('lets explicit user rules win over smart categorization', () => {
-    const rules = [{ id: 1, categoryId: 3, matchText: 'whole foods', createdAt: 1 }] satisfies CategoryRule[]
+    const rules = [{ id: 1, categoryId: 3, matchText: 'whole foods', createdAt: 1 }] satisfies CategoryRuleRecord[]
 
     const result = categorizeTransaction({
       description: 'WHOLE FOODS MARKET 10293 NY',
@@ -81,7 +81,7 @@ describe('local transaction categorization', () => {
   })
 })
 
-function category(id: number, name: string): Category {
+function category(id: number, name: string): CategoryRecord {
   return {
     id,
     name,

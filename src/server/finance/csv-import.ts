@@ -1,14 +1,6 @@
 import { createHash } from "node:crypto";
-import { desc, eq, inArray } from "drizzle-orm";
-import {
-  accounts,
-  categories,
-  categoryRules,
-  connections,
-  transactions,
-} from "../db/schema";
-import { getDb } from "../db/client";
 import { categorizeTransaction, normalizeMerchant } from "./categorization";
+import { getStore, type CategoryRecord, type CategoryRuleRecord } from "../storage/store";
 
 export type CsvImportResult = {
   status: "success";
@@ -51,17 +43,13 @@ export async function importTransactionsCsv(input: {
   accountId?: string | null;
 }): Promise<CsvImportResult> {
   const rows = parseTransactionsCsv(input.contents, input.accountId);
-  const db = getDb();
+  const store = getStore();
   const now = unixNow();
-  const accountMap = ensureImportAccounts(rows, input.accountId);
-  const categoryRows = db.select().from(categories).all();
-  const rules = db
-    .select()
-    .from(categoryRules)
-    .orderBy(desc(categoryRules.createdAt))
-    .all();
+  const accountMap = await ensureImportAccounts(rows, input.accountId);
+  const categoryRows = await store.listCategories();
+  const rules = await store.listCategoryRules();
   const candidates = buildImportTransactions(rows, accountMap);
-  const duplicateMatcher = createDuplicateMatcher([
+  const duplicateMatcher = await createDuplicateMatcher([
     ...new Set(candidates.map((candidate) => candidate.accountId)),
   ]);
   let inserted = 0;
@@ -79,34 +67,30 @@ export async function importTransactionsCsv(input: {
       categoryRows,
       rules,
     );
-    const result = db
-      .insert(transactions)
-      .values({
-        id: candidate.simplefinId,
-        accountId: candidate.accountId,
-        simplefinId: candidate.simplefinId,
-        postedAt: candidate.postedAt,
-        transactedAt: candidate.transactedAt,
-        amount: candidate.amount,
-        currency: "USD",
-        description: candidate.description,
-        pending: false,
-        categoryId: categorization.categoryId,
-        categorySource: categorization.categorySource,
-        categoryConfidence: categorization.categoryConfidence,
-        categoryReason: categorization.categoryReason,
-        normalizedMerchant: categorization.normalizedMerchant,
-        raw: JSON.stringify({
-          source: candidate.source,
-          fileName: input.fileName,
-          row: candidate.row,
-        }),
-        updatedAt: now,
-      })
-      .onConflictDoNothing()
-      .run();
+    const stored = await store.insertTransactionIfAbsent({
+      id: candidate.simplefinId,
+      accountId: candidate.accountId,
+      simplefinId: candidate.simplefinId,
+      postedAt: candidate.postedAt,
+      transactedAt: candidate.transactedAt,
+      amount: candidate.amount,
+      currency: "USD",
+      description: candidate.description,
+      pending: false,
+      categoryId: categorization.categoryId,
+      categorySource: categorization.categorySource,
+      categoryConfidence: categorization.categoryConfidence,
+      categoryReason: categorization.categoryReason,
+      normalizedMerchant: categorization.normalizedMerchant,
+      raw: JSON.stringify({
+        source: candidate.source,
+        fileName: input.fileName,
+        row: candidate.row,
+      }),
+      updatedAt: now,
+    });
 
-    if (result.changes > 0) {
+    if (stored) {
       duplicateMatcher.add(candidate);
       inserted += 1;
     } else {
@@ -277,11 +261,11 @@ function parseDiscoverRecords(records: string[][], accountId?: string | null) {
     );
 }
 
-function ensureImportAccounts(
+async function ensureImportAccounts(
   rows: ImportedCsvRow[],
   selectedAccountId?: string | null,
 ) {
-  const db = getDb();
+  const store = getStore();
   const now = unixNow();
   const map = new Map<string, { accountId: string; created: boolean }>();
   const discoverRows = rows.filter((row) => row.source !== "capital-one-csv");
@@ -291,11 +275,7 @@ function ensureImportAccounts(
         "Choose the account this CSV belongs to before importing this file.",
       );
     }
-    const selectedAccount = db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.id, selectedAccountId))
-      .get();
+    const selectedAccount = await store.getAccount(selectedAccountId);
     if (!selectedAccount) {
       throw new Error("Choose a valid account for this CSV import.");
     }
@@ -313,27 +293,20 @@ function ensureImportAccounts(
         .filter(Boolean),
     ),
   ];
-  const accountRows = db.select().from(accounts).all();
-  const existingCapitalOneConnection = db
-    .select()
-    .from(connections)
-    .where(eq(connections.name, "Capital One"))
-    .get();
+  const accountRows = await store.listAccounts();
+  const existingCapitalOneConnection = await store.getConnectionByName("Capital One");
   const connectionId = existingCapitalOneConnection?.id ?? "capital-one-csv";
 
   if (!existingCapitalOneConnection) {
-    db.insert(connections)
-      .values({
-        id: connectionId,
-        name: "Capital One",
-        orgId: "capital-one-csv",
-        orgName: "Capital One",
-        orgUrl: "https://www.capitalone.com",
-        simplefinUrl: null,
-        updatedAt: now,
-      })
-      .onConflictDoNothing()
-      .run();
+    await store.upsertConnection({
+      id: connectionId,
+      name: "Capital One",
+      orgId: "capital-one-csv",
+      orgName: "Capital One",
+      orgUrl: "https://www.capitalone.com",
+      simplefinUrl: null,
+      updatedAt: now,
+    });
   }
 
   for (const cardNo of cardNumbers) {
@@ -348,26 +321,19 @@ function ensureImportAccounts(
 
     const simplefinId = `csv-card-${cardNo}`;
     const accountId = `${connectionId}:${simplefinId}`;
-    const existing = db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.id, accountId))
-      .get();
-    db.insert(accounts)
-      .values({
-        id: accountId,
-        connectionId,
-        simplefinId,
-        name: `Capital One Card (${cardNo})`,
-        currency: "USD",
-        balance: 0,
-        availableBalance: null,
-        balanceDate: now,
-        historyCursor: null,
-        updatedAt: now,
-      })
-      .onConflictDoNothing()
-      .run();
+    const existing = await store.getAccount(accountId);
+    await store.upsertAccount({
+      id: accountId,
+      connectionId,
+      simplefinId,
+      name: `Capital One Card (${cardNo})`,
+      currency: "USD",
+      balance: 0,
+      availableBalance: null,
+      balanceDate: now,
+      historyCursor: null,
+      updatedAt: now,
+    });
     map.set(cardNo, { accountId, created: !existing });
   }
 
@@ -422,8 +388,7 @@ function buildImportTransactions(
   return transactions;
 }
 
-function createDuplicateMatcher(accountIds: string[]) {
-  const db = getDb();
+async function createDuplicateMatcher(accountIds: string[]) {
   const exactCounts = new Map<string, number>();
   const looseCounts = new Map<string, number>();
   if (!accountIds.length) {
@@ -433,16 +398,7 @@ function createDuplicateMatcher(accountIds: string[]) {
     };
   }
 
-  const rows = db
-    .select({
-      accountId: transactions.accountId,
-      postedAt: transactions.postedAt,
-      amount: transactions.amount,
-      description: transactions.description,
-    })
-    .from(transactions)
-    .where(inArray(transactions.accountId, accountIds))
-    .all();
+  const rows = await getStore().listTransactionsByAccountIds(accountIds);
 
   for (const row of rows) {
     addCount(
@@ -511,8 +467,8 @@ function createDuplicateMatcher(accountIds: string[]) {
 
 function categorizeCsvTransaction(
   transaction: ImportTransaction,
-  categoryRows: Array<typeof categories.$inferSelect>,
-  rules: Array<typeof categoryRules.$inferSelect>,
+  categoryRows: CategoryRecord[],
+  rules: CategoryRuleRecord[],
 ) {
   const mappedCategoryName = mapCapitalOneCategory(transaction.csvCategory);
   const mappedCategory = mappedCategoryName

@@ -1,4 +1,4 @@
-import type { Category, CategoryRule } from '../db/schema'
+import type { CategoryRecord, CategoryRuleRecord } from '../storage/store'
 import { matchCategoryRule } from './categories'
 
 export type CategorizationInput = {
@@ -167,8 +167,8 @@ const categoryGroups: CategoryGroup[] = [
 
 export function categorizeTransaction(
   input: CategorizationInput,
-  categories: Category[],
-  rules: CategoryRule[],
+  categories: CategoryRecord[],
+  rules: CategoryRuleRecord[],
 ): CategorizationResult {
   const categoryByName = new Map(categories.map((category) => [category.name.toLocaleLowerCase(), category]))
   const normalizedMerchant = normalizeMerchant(input.description)
@@ -252,7 +252,7 @@ export function normalizeMerchant(description: string) {
 
 function categorizeByDirection(
   input: CategorizationInput,
-  categoryByName: Map<string, Category>,
+  categoryByName: Map<string, CategoryRecord>,
   normalizedMerchant: string | null,
 ): CategorizationResult | null {
   const normalized = normalizeForMatching(input.description)

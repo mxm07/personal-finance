@@ -1,9 +1,7 @@
-import { and, asc, desc, eq, gte, like, lte, sql } from 'drizzle-orm'
-import { accounts, categories, categoryRules, connections, syncRuns, transactions } from './db/schema'
-import { getDb } from './db/client'
 import { readAccessUrl } from './secret'
 import { ensureStartupSync } from './sync'
 import { summarizeBalances, summarizeCashFlow } from './finance/calculations'
+import { getStore, type AccountRecord, type TransactionRecord } from './storage/store'
 
 const monthStart = () => {
   const now = new Date()
@@ -12,35 +10,24 @@ const monthStart = () => {
 
 export async function getDashboardData() {
   await ensureStartupSync()
-  const db = getDb()
-  const accountRows = db.select().from(accounts).all()
-  const accountList = getAccountList()
+  const store = getStore()
+  const accountRows = await store.listAccounts()
+  const accountList = await getAccountList()
+  const transactions = await getTransactionsWithRelations()
   const start = monthStart()
-  const cashFlowRows = db.select({
-    currency: transactions.currency,
-    amount: transactions.amount,
-    pending: transactions.pending,
-  }).from(transactions).where(gte(transactions.postedAt, start)).all()
-  const monthTransactionRows = db.select({
-    postedAt: transactions.postedAt,
-    amount: transactions.amount,
-    currency: transactions.currency,
-    pending: transactions.pending,
-    categoryName: categories.name,
-  }).from(transactions)
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(gte(transactions.postedAt, start))
-    .all()
-  const chartTransactions = db.select({
-    postedAt: transactions.postedAt,
-    amount: transactions.amount,
-    currency: transactions.currency,
-    pending: transactions.pending,
-    categoryName: categories.name,
-  }).from(transactions)
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .orderBy(transactions.postedAt)
-    .all()
+  const cashFlowRows = transactions
+    .filter((transaction) => transaction.postedAt >= start)
+    .map((transaction) => ({
+      currency: transaction.currency,
+      amount: transaction.amount,
+      pending: transaction.pending,
+    }))
+  const monthTransactionRows = transactions
+    .filter((transaction) => transaction.postedAt >= start)
+    .map(toChartTransaction)
+  const chartTransactions = transactions
+    .map(toChartTransaction)
+    .sort((a, b) => a.postedAt - b.postedAt)
 
   return {
     balances: summarizeBalances(accountRows.map((account) => ({
@@ -52,7 +39,7 @@ export async function getDashboardData() {
     spendingByCategory: buildSpendingByCategory(monthTransactionRows),
     chartTransactions,
     accountBalances: buildAccountBalances(accountList),
-    recentTransactions: getTransactionList({ pageSize: 10 }).rows.slice(0, 8),
+    recentTransactions: (await getTransactionList({ pageSize: 10 })).rows.slice(0, 8),
     accounts: accountList,
     status: await getStatus(),
   }
@@ -61,95 +48,80 @@ export async function getDashboardData() {
 export async function getAccountsPageData() {
   await ensureStartupSync()
   return {
-    accounts: getAccountList(),
+    accounts: await getAccountList(),
     status: await getStatus(),
   }
 }
 
-export async function getTransactionsPageData(input?: {
-  search?: string
-  categoryId?: number | null
-  accountId?: string
-  connectionId?: string
-  pending?: string
-  startDate?: string
-  endDate?: string
-  minAmount?: number
-  maxAmount?: number
-  page?: number
-  pageSize?: number
-  sortBy?: string
-  sortDir?: string
-  limit?: number
-}) {
+export async function getTransactionsPageData(input?: TransactionListInput) {
   await ensureStartupSync()
   return {
-    transactions: getTransactionList(input),
-    accounts: getAccountList(),
-    categories: getCategories(),
+    transactions: await getTransactionList(input),
+    accounts: await getAccountList(),
+    categories: await getCategories(),
     status: await getStatus(),
   }
 }
 
 export async function getCategoriesPageData() {
   await ensureStartupSync()
-  const db = getDb()
+  const store = getStore()
+  const categories = await getCategories()
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
   return {
-    categories: getCategories(),
-    rules: db.select({
-      id: categoryRules.id,
-      categoryId: categoryRules.categoryId,
-      categoryName: categories.name,
-      matchText: categoryRules.matchText,
-      createdAt: categoryRules.createdAt,
-    }).from(categoryRules)
-      .leftJoin(categories, eq(categoryRules.categoryId, categories.id))
-      .orderBy(desc(categoryRules.createdAt))
-      .all(),
+    categories,
+    rules: (await store.listCategoryRules()).map((rule) => ({
+      id: rule.id,
+      categoryId: rule.categoryId,
+      categoryName: categoryById.get(rule.categoryId)?.name ?? null,
+      matchText: rule.matchText,
+      createdAt: rule.createdAt,
+    })),
   }
 }
 
 export async function getSetupPageData() {
   return {
-    accounts: getAccountList(),
+    accounts: await getAccountList(),
     status: await getStatus(),
-    syncHistory: getDb().select().from(syncRuns).orderBy(desc(syncRuns.startedAt)).limit(15).all(),
+    syncHistory: (await getStore().listSyncRuns()).sort((a, b) => b.startedAt - a.startedAt).slice(0, 15),
   }
 }
 
 export async function getStatus() {
-  const db = getDb()
-  const latestSync = db.select().from(syncRuns).orderBy(desc(syncRuns.startedAt)).limit(1).get() ?? null
   return {
     connected: Boolean(await readAccessUrl()),
-    latestSync,
+    latestSync: await getStore().getLatestSyncRun(),
   }
 }
 
-export function getAccountList() {
-  const db = getDb()
-  return db.select({
-    id: accounts.id,
-    simplefinId: accounts.simplefinId,
-    name: accounts.name,
-    currency: accounts.currency,
-    balance: accounts.balance,
-    availableBalance: accounts.availableBalance,
-    balanceDate: accounts.balanceDate,
-    connectionId: accounts.connectionId,
-    connectionName: connections.name,
-    orgName: connections.orgName,
-  }).from(accounts)
-    .leftJoin(connections, eq(accounts.connectionId, connections.id))
-    .orderBy(connections.name, accounts.name)
-    .all()
+export async function getAccountList() {
+  const store = getStore()
+  const [accounts, connections] = await Promise.all([
+    store.listAccounts(),
+    store.listConnections(),
+  ])
+  const connectionById = new Map(connections.map((connection) => [connection.id, connection]))
+
+  return accounts.map((account) => ({
+    id: account.id,
+    simplefinId: account.simplefinId,
+    name: account.name,
+    currency: account.currency,
+    balance: account.balance,
+    availableBalance: account.availableBalance,
+    balanceDate: account.balanceDate,
+    connectionId: account.connectionId,
+    connectionName: connectionById.get(account.connectionId)?.name ?? null,
+    orgName: connectionById.get(account.connectionId)?.orgName ?? null,
+  })).sort((a, b) => `${a.connectionName ?? ''}:${a.name}`.localeCompare(`${b.connectionName ?? ''}:${b.name}`))
 }
 
-export function getCategories() {
-  return getDb().select().from(categories).orderBy(categories.name).all()
+export async function getCategories() {
+  return getStore().listCategories()
 }
 
-function getTransactionList(input: {
+type TransactionListInput = {
   limit?: number
   page?: number
   pageSize?: number
@@ -164,88 +136,100 @@ function getTransactionList(input: {
   maxAmount?: number
   sortBy?: string
   sortDir?: string
-} = {}) {
-  const db = getDb()
-  const filters = []
+}
+
+async function getTransactionList(input: TransactionListInput = {}) {
+  const pageSize = normalizePageSize(input.pageSize ?? input.limit)
+  const sortBy = normalizeTransactionSortBy(input.sortBy)
+  const sortDir = input.sortDir === 'asc' ? 'asc' : 'desc'
+  let rows = await getTransactionsWithRelations()
+
   if (input.search) {
-    filters.push(like(transactions.description, `%${input.search}%`))
+    const query = input.search.toLocaleLowerCase()
+    rows = rows.filter((transaction) => transaction.description.toLocaleLowerCase().includes(query))
   }
-  if (input.categoryId) {
-    filters.push(eq(transactions.categoryId, input.categoryId))
+  if (input.categoryId === null) {
+    rows = rows.filter((transaction) => transaction.categoryId == null)
+  } else if (input.categoryId) {
+    rows = rows.filter((transaction) => transaction.categoryId === input.categoryId)
   }
   if (input.accountId) {
-    filters.push(eq(transactions.accountId, input.accountId))
+    rows = rows.filter((transaction) => transaction.accountId === input.accountId)
   }
   if (input.connectionId) {
-    filters.push(eq(accounts.connectionId, input.connectionId))
+    rows = rows.filter((transaction) => transaction.connectionId === input.connectionId)
   }
   if (input.pending === 'posted') {
-    filters.push(eq(transactions.pending, false))
+    rows = rows.filter((transaction) => !transaction.pending)
   }
   if (input.pending === 'pending') {
-    filters.push(eq(transactions.pending, true))
+    rows = rows.filter((transaction) => transaction.pending)
   }
   if (input.startDate) {
-    filters.push(gte(transactions.postedAt, toEpoch(input.startDate)))
+    rows = rows.filter((transaction) => transaction.postedAt >= toEpoch(input.startDate!))
   }
   if (input.endDate) {
-    filters.push(lte(transactions.postedAt, toEpoch(input.endDate) + 86_399))
+    rows = rows.filter((transaction) => transaction.postedAt <= toEpoch(input.endDate!) + 86_399)
   }
   if (typeof input.minAmount === 'number' && Number.isFinite(input.minAmount)) {
-    filters.push(gte(transactions.amount, input.minAmount))
+    rows = rows.filter((transaction) => transaction.amount >= input.minAmount!)
   }
   if (typeof input.maxAmount === 'number' && Number.isFinite(input.maxAmount)) {
-    filters.push(lte(transactions.amount, input.maxAmount))
+    rows = rows.filter((transaction) => transaction.amount <= input.maxAmount!)
   }
-  const where = filters.length ? and(...filters) : sql`1 = 1`
-  const pageSize = normalizePageSize(input.pageSize ?? input.limit)
-  const total = db.select({
-    count: sql<number>`count(*)`,
-  }).from(transactions)
-    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(connections, eq(accounts.connectionId, connections.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(where)
-    .get()?.count ?? 0
+
+  rows.sort((a, b) => compareTransactions(a, b, sortBy, sortDir))
+
+  const total = rows.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const page = Math.min(Math.max(1, input.page ?? 1), pageCount)
-  const sort = getTransactionSort(input.sortBy, input.sortDir)
-
-  const rows = db.select({
-    id: transactions.id,
-    postedAt: transactions.postedAt,
-    transactedAt: transactions.transactedAt,
-    amount: transactions.amount,
-    currency: transactions.currency,
-    description: transactions.description,
-    pending: transactions.pending,
-    categoryId: transactions.categoryId,
-    categoryName: categories.name,
-    categorySource: transactions.categorySource,
-    categoryConfidence: transactions.categoryConfidence,
-    categoryReason: transactions.categoryReason,
-    normalizedMerchant: transactions.normalizedMerchant,
-    accountId: accounts.id,
-    accountName: accounts.name,
-    connectionName: connections.name,
-  }).from(transactions)
-    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .leftJoin(connections, eq(accounts.connectionId, connections.id))
-    .leftJoin(categories, eq(transactions.categoryId, categories.id))
-    .where(where)
-    .orderBy(sort, desc(transactions.updatedAt), desc(transactions.id))
-    .limit(pageSize)
-    .offset((page - 1) * pageSize)
-    .all()
 
   return {
-    rows,
+    rows: rows.slice((page - 1) * pageSize, page * pageSize),
     page,
     pageSize,
     total,
     pageCount,
-    sortBy: normalizeTransactionSortBy(input.sortBy),
-    sortDir: input.sortDir === 'asc' ? 'asc' : 'desc',
+    sortBy,
+    sortDir,
+  }
+}
+
+async function getTransactionsWithRelations() {
+  const store = getStore()
+  const [transactions, accounts, connections, categories] = await Promise.all([
+    store.listTransactions(),
+    store.listAccounts(),
+    store.listConnections(),
+    store.listCategories(),
+  ])
+  const accountById = new Map(accounts.map((account) => [account.id, account]))
+  const connectionById = new Map(connections.map((connection) => [connection.id, connection]))
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
+
+  return transactions.map((transaction) => {
+    const account = accountById.get(transaction.accountId)
+    const connection = account ? connectionById.get(account.connectionId) : undefined
+    const category = transaction.categoryId == null ? undefined : categoryById.get(transaction.categoryId)
+
+    return {
+      ...transaction,
+      categoryName: category?.name ?? null,
+      accountName: account?.name ?? null,
+      connectionId: account?.connectionId ?? null,
+      connectionName: connection?.name ?? null,
+    }
+  })
+}
+
+function toChartTransaction(transaction: TransactionRecord & { categoryName: string | null }) {
+  return {
+    postedAt: transaction.postedAt,
+    amount: transaction.amount,
+    currency: transaction.currency,
+    pending: transaction.pending,
+    categoryId: transaction.categoryId,
+    categoryName: transaction.categoryName,
   }
 }
 
@@ -258,25 +242,39 @@ function normalizeTransactionSortBy(sortBy?: string) {
   return allowed.includes(sortBy as typeof allowed[number]) ? sortBy as typeof allowed[number] : 'date'
 }
 
-function getTransactionSort(sortBy?: string, sortDir?: string) {
-  const direction = sortDir === 'asc' ? asc : desc
-  switch (normalizeTransactionSortBy(sortBy)) {
-    case 'description':
-      return direction(transactions.description)
-    case 'account':
-      return direction(accounts.name)
-    case 'institution':
-      return direction(connections.name)
-    case 'category':
-      return direction(categories.name)
-    case 'amount':
-      return direction(transactions.amount)
-    case 'pending':
-      return direction(transactions.pending)
-    case 'date':
-    default:
-      return direction(transactions.postedAt)
-  }
+type TransactionSortBy = ReturnType<typeof normalizeTransactionSortBy>
+type TransactionWithRelations = TransactionRecord & {
+  accountName: string | null
+  categoryName: string | null
+  connectionId: string | null
+  connectionName: string | null
+}
+
+function compareTransactions(a: TransactionWithRelations, b: TransactionWithRelations, sortBy: TransactionSortBy, sortDir: 'asc' | 'desc') {
+  const direction = sortDir === 'asc' ? 1 : -1
+  const value = (() => {
+    switch (sortBy) {
+      case 'description':
+        return a.description.localeCompare(b.description)
+      case 'account':
+        return (a.accountName ?? '').localeCompare(b.accountName ?? '')
+      case 'institution':
+        return (a.connectionName ?? '').localeCompare(b.connectionName ?? '')
+      case 'category':
+        return (a.categoryName ?? '').localeCompare(b.categoryName ?? '')
+      case 'amount':
+        return a.amount - b.amount
+      case 'pending':
+        return Number(a.pending) - Number(b.pending)
+      case 'date':
+      default:
+        return a.postedAt - b.postedAt
+    }
+  })()
+
+  return value === 0
+    ? direction * ((a.updatedAt - b.updatedAt) || a.id.localeCompare(b.id))
+    : direction * value
 }
 
 function toEpoch(date: string) {
@@ -354,7 +352,7 @@ function buildSpendingByCategory(rows: Array<{
   }))
 }
 
-function buildAccountBalances(rows: ReturnType<typeof getAccountList>) {
+function buildAccountBalances(rows: Awaited<ReturnType<typeof getAccountList>>) {
   const sorted = [...rows].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))
   const totalMagnitude = sorted.reduce((sum, row) => sum + Math.abs(row.balance), 0)
 

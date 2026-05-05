@@ -50,7 +50,9 @@ export const Route = createFileRoute('/transactions')({
       search: deps.search,
       accountId: deps.accountId,
       connectionId: deps.connectionId,
-      categoryId: deps.categoryId ? Number(deps.categoryId) : undefined,
+      categoryId: deps.categoryId === 'uncategorized'
+        ? null
+        : deps.categoryId ? Number(deps.categoryId) : undefined,
       pending: deps.pending,
       startDate: deps.startDate,
       endDate: deps.endDate,
@@ -240,6 +242,7 @@ function TransactionsPage() {
                     <span>Category</span>
                     <select className={styles.field} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
                       <option value="">All categories</option>
+                      <option value="uncategorized">Uncategorized</option>
                       {data.categories.map((category) => (
                         <option key={category.id} value={category.id}>{category.name}</option>
                       ))}

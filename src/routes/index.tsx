@@ -17,6 +17,7 @@ export const Route = createFileRoute('/')({
 
 function OverviewPage() {
   const data = Route.useLoaderData()
+  const router = useRouter()
   const [incomeRange, setIncomeRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
   const [spendingRange, setSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
   const [topSpendingRange, setTopSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
@@ -36,6 +37,21 @@ function OverviewPage() {
     day: 'numeric',
     year: 'numeric',
   }).format(new Date())
+  const openTransactionsForCategory = (range: TimeRangeValue, item: CategoryBreakdownRow) => {
+    const bounds = getTimeRangeBounds(range)
+
+    void router.navigate({
+      to: '/transactions',
+      search: {
+        categoryId: item.categoryId == null ? 'uncategorized' : String(item.categoryId),
+        startDate: bounds.startDate,
+        endDate: bounds.endDate,
+        page: 1,
+        sortBy: 'date',
+        sortDir: 'desc',
+      },
+    })
+  }
 
   return (
     <section className={styles.page}>
@@ -99,15 +115,24 @@ function OverviewPage() {
             <TimeRangePicker value={spendingRange} onChange={setSpendingRange} />
           </div>
           <div className={styles.donutWrap}>
-            <DonutChart rows={spendingRows} totalLabel={formatMoney(spendingChartData.moneyOut, spendingChartData.currency)} />
+            <DonutChart
+              rows={spendingRows}
+              totalLabel={formatMoney(spendingChartData.moneyOut, spendingChartData.currency)}
+              onRowClick={(item) => openTransactionsForCategory(spendingRange, item)}
+            />
             <div className={styles.categoryList}>
               {spendingRows.map((item) => (
-                <div className={styles.categoryRow} key={item.name}>
+                <button
+                  className={`${styles.categoryRow} ${styles.clickableRow}`}
+                  key={`${item.categoryId ?? 'uncategorized'}-${item.name}`}
+                  type="button"
+                  onClick={() => openTransactionsForCategory(spendingRange, item)}
+                >
                   <span className={styles.dot} style={{ background: item.color }} />
                   <span className={styles.rowTitle}>{item.name}</span>
                   <span>{formatMoney(item.amount, item.currency)}</span>
                   <span className={styles.rowMeta}>{item.percent}%</span>
-                </div>
+                </button>
               ))}
               {!spendingRows.length ? <p className={styles.subtle}>No spending synced yet.</p> : null}
             </div>
@@ -121,11 +146,16 @@ function OverviewPage() {
           </div>
           <div className={styles.budgetList}>
             {topSpendingRows.map((item) => (
-              <div className={styles.budgetRow} key={item.name}>
+              <button
+                className={`${styles.budgetRow} ${styles.clickableRow}`}
+                key={`${item.categoryId ?? 'uncategorized'}-${item.name}`}
+                type="button"
+                onClick={() => openTransactionsForCategory(topSpendingRange, item)}
+              >
                 <span className={styles.rowTitle}>{item.name}</span>
                 <span className={styles.rowMeta}>{formatMoney(item.amount, item.currency)} · {item.percent}%</span>
                 <span className={styles.budgetTrack}><span className={styles.budgetFill} style={{ width: `${item.percent}%` }} /></span>
-              </div>
+              </button>
             ))}
             {!topSpendingRows.length ? <p className={styles.subtle}>No category activity yet.</p> : null}
           </div>
@@ -221,10 +251,12 @@ function OverviewPage() {
 }
 
 function DonutChart({
+  onRowClick,
   rows,
   totalLabel,
 }: {
-  rows: Array<{ name: string; amount: number; currency: string; percent: number; color: string }>
+  onRowClick?: (row: DisplayCategoryBreakdownRow) => void
+  rows: DisplayCategoryBreakdownRow[]
   totalLabel: string
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
@@ -255,9 +287,18 @@ function DonutChart({
               strokeDasharray={`${length} ${circumference - length}`}
               strokeDashoffset={dashOffset}
               strokeWidth="28"
+              role="button"
+              aria-label={`View ${row.name} transactions`}
               tabIndex={0}
               transform="rotate(-90 90 90)"
               className={styles.donutSector}
+              onClick={() => onRowClick?.(row)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onRowClick?.(row)
+                }
+              }}
               onBlur={() => setActiveIndex(null)}
               onFocus={() => setActiveIndex(index)}
               onMouseEnter={() => setActiveIndex(index)}
@@ -334,7 +375,20 @@ type ChartTransaction = {
   amount: number
   currency: string
   pending: boolean
+  categoryId: number | null
   categoryName: string | null
+}
+
+type CategoryBreakdownRow = {
+  categoryId: number | null
+  name: string
+  amount: number
+  currency: string
+  percent: number
+}
+
+type DisplayCategoryBreakdownRow = CategoryBreakdownRow & {
+  color: string
 }
 
 function buildChartData(transactions: ChartTransaction[], range: TimeRangeValue) {
@@ -406,7 +460,7 @@ function buildRangeCashFlow(rows: ChartTransaction[], startEpoch: number, endEpo
 }
 
 function buildRangeSpendingByCategory(rows: ChartTransaction[]) {
-  const totals = new Map<string, { name: string; amount: number; currency: string }>()
+  const totals = new Map<string, { categoryId: number | null; name: string; amount: number; currency: string }>()
 
   for (const row of rows) {
     if (row.amount >= 0) {
@@ -414,9 +468,10 @@ function buildRangeSpendingByCategory(rows: ChartTransaction[]) {
     }
 
     const name = row.categoryName ?? 'Uncategorized'
-    const current = totals.get(name) ?? { name, amount: 0, currency: row.currency }
+    const key = row.categoryId == null ? 'uncategorized' : String(row.categoryId)
+    const current = totals.get(key) ?? { categoryId: row.categoryId, name, amount: 0, currency: row.currency }
     current.amount += Math.abs(row.amount)
-    totals.set(name, current)
+    totals.set(key, current)
   }
 
   const sorted = [...totals.values()].sort((a, b) => b.amount - a.amount)

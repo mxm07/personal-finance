@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - dynamodb
+    environment:
+      APP_BASE_URL: http://localhost:3000
+      AWS_ACCESS_KEY_ID: local
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: local
+      DYNAMODB_ENDPOINT: http://dynamodb:8000
+      DYNAMODB_TABLE_NAME: personal-finance-dev
+      GOOGLE_ALLOWED_EMAILS: ${GOOGLE_ALLOWED_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SESSION_PASSWORD: ${SESSION_PASSWORD:-replace-with-at-least-32-random-characters}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - app-node-modules:/app/node_modules
+
+  dynamodb:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data"
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8000:8000"
+    user: root
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+
+volumes:
+  app-node-modules:
+  dynamodb-data:

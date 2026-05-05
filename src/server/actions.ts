@@ -1,10 +1,8 @@
-import { and, eq } from 'drizzle-orm'
-import { categories, categoryRules, transactions } from './db/schema'
-import { getDb } from './db/client'
 import { claimAccessUrl } from './simplefin/client'
 import { clearAccessUrl, writeAccessUrl } from './secret'
 import { syncSimpleFin, syncSimpleFinHistory } from './sync'
 import { normalizeMerchant } from './finance/categorization'
+import { getStore } from './storage/store'
 
 const palette = ['#236b46', '#8b5e1d', '#a73e2f', '#245b73', '#6b5b95', '#537a5a', '#b35c44', '#9c6a18']
 
@@ -33,20 +31,20 @@ export async function clearSimpleFinConnection() {
 }
 
 export async function assignCategory(input: { transactionId: string; categoryId: number | null }) {
-  const db = getDb()
-  const transaction = db.select().from(transactions).where(eq(transactions.id, input.transactionId)).get()
+  const store = getStore()
+  const transaction = await store.getTransaction(input.transactionId)
 
-  db.update(transactions).set({
+  await store.updateTransaction(input.transactionId, {
     categoryId: input.categoryId,
     categorySource: input.categoryId ? 'manual' : null,
     categoryConfidence: input.categoryId ? 1 : null,
     categoryReason: input.categoryId ? 'set manually' : null,
     normalizedMerchant: transaction ? normalizeMerchant(transaction.description) : null,
     updatedAt: unixNow(),
-  }).where(eq(transactions.id, input.transactionId)).run()
+  })
 
   if (transaction && input.categoryId) {
-    learnRuleFromManualCategory(transaction.description, input.categoryId)
+    await learnRuleFromManualCategory(transaction.description, input.categoryId)
   }
 
   return { ok: true }
@@ -58,11 +56,11 @@ export async function createCategory(input: { name: string }) {
     throw new Error('Category name is required.')
   }
   const color = palette[name.length % palette.length]
-  getDb().insert(categories).values({
+  await getStore().createCategory({
     name,
     color,
     createdAt: unixNow(),
-  }).onConflictDoNothing().run()
+  })
 
   return { ok: true }
 }
@@ -72,17 +70,17 @@ export async function createCategoryRule(input: { categoryId: number; matchText:
   if (!matchText) {
     throw new Error('Rule text is required.')
   }
-  getDb().insert(categoryRules).values({
+  await getStore().createCategoryRule({
     categoryId: input.categoryId,
     matchText,
     createdAt: unixNow(),
-  }).run()
+  })
 
   return { ok: true }
 }
 
 export async function deleteCategoryRule(input: { ruleId: number }) {
-  getDb().delete(categoryRules).where(eq(categoryRules.id, input.ruleId)).run()
+  await getStore().deleteCategoryRule(input.ruleId)
   return { ok: true }
 }
 
@@ -90,27 +88,23 @@ function unixNow() {
   return Math.floor(Date.now() / 1000)
 }
 
-function learnRuleFromManualCategory(description: string, categoryId: number) {
+async function learnRuleFromManualCategory(description: string, categoryId: number) {
   const matchText = normalizeMerchant(description)
   if (!matchText || matchText.length < 4 || learnedRuleBlocklist.has(matchText)) {
     return
   }
 
-  const db = getDb()
-  const existing = db.select().from(categoryRules).where(and(
-    eq(categoryRules.categoryId, categoryId),
-    eq(categoryRules.matchText, matchText),
-  )).get()
-
+  const store = getStore()
+  const existing = await store.findCategoryRule(categoryId, matchText)
   if (existing) {
     return
   }
 
-  db.insert(categoryRules).values({
+  await store.createCategoryRule({
     categoryId,
     matchText,
     createdAt: unixNow(),
-  }).run()
+  })
 }
 
 const learnedRuleBlocklist = new Set([

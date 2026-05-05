@@ -1,11 +1,9 @@
-import { desc, eq, sql } from 'drizzle-orm'
 import { ZodError } from 'zod'
-import { accounts, categories, categoryRules, connections, syncRuns, transactions } from './db/schema'
-import { getDb } from './db/client'
 import { readAccessUrl } from './secret'
 import { fetchAccountSet, sanitizeSimpleFinMessage, SimpleFinError } from './simplefin/client'
 import type { SimpleFinAccountSet } from './simplefin/types'
 import { categorizeTransaction } from './finance/categorization'
+import { getStore, type AccountRecord } from './storage/store'
 
 const overlapSeconds = 60 * 60 * 24 * 3
 const initialSyncLookbackSeconds = 60 * 60 * 24 * 90
@@ -85,64 +83,62 @@ export async function syncSimpleFinHistory(): Promise<SyncResult> {
 }
 
 async function runSync(trigger: string): Promise<SyncResult> {
-  const db = getDb()
+  const store = getStore()
   const accessUrl = await readAccessUrl()
   if (!accessUrl) {
     return { status: 'skipped', message: 'SimpleFIN is not connected yet.' }
   }
 
-  const now = unixNow()
-  const run = db.insert(syncRuns).values({
+  const run = await store.createSyncRun({
     trigger,
     status: 'running',
-    startedAt: now,
-  }).returning({ id: syncRuns.id }).get()
+    startedAt: unixNow(),
+  })
 
   try {
-    const startDate = getSyncStartDate()
+    const startDate = await getSyncStartDate()
     const accountSet = await fetchAccountSet(accessUrl, startDate)
-    upsertAccountSet(accountSet)
-    categorizeStoredTransactions()
+    await upsertAccountSet(accountSet)
+    await categorizeStoredTransactions()
     const message = accountSet.errlist.length
       ? summarizeSimpleFinMessages(accountSet.errlist.map((error) => error.msg ?? error.message ?? error.code))
       : 'Sync completed.'
 
-    db.update(syncRuns).set({
+    await store.updateSyncRun(run.id, {
       status: 'success',
       finishedAt: unixNow(),
       message,
-    }).where(eq(syncRuns.id, run.id)).run()
+    })
 
     return { status: 'success', message }
   } catch (error) {
     const message = getSyncErrorMessage(error)
 
-    db.update(syncRuns).set({
+    await store.updateSyncRun(run.id, {
       status: 'failed',
       finishedAt: unixNow(),
       message,
-    }).where(eq(syncRuns.id, run.id)).run()
+    })
 
     return { status: 'failed', message }
   }
 }
 
 async function runHistoricalBackfill(): Promise<SyncResult> {
-  const db = getDb()
+  const store = getStore()
   const accessUrl = await readAccessUrl()
   if (!accessUrl) {
     return { status: 'skipped', message: 'SimpleFIN is not connected yet.' }
   }
 
-  const now = unixNow()
-  const run = db.insert(syncRuns).values({
+  const run = await store.createSyncRun({
     trigger: 'history',
     status: 'running',
-    startedAt: now,
-  }).returning({ id: syncRuns.id }).get()
+    startedAt: unixNow(),
+  })
 
   try {
-    const accountStates = createHistoricalBackfillStates(getHistoricalBackfillAccounts())
+    const accountStates = createHistoricalBackfillStates(await getHistoricalBackfillAccounts())
     const receivedTransactions = new Set<string>()
     const insertedTransactions = new Set<string>()
     let requestedWindows = 0
@@ -162,7 +158,7 @@ async function runHistoricalBackfill(): Promise<SyncResult> {
         requestedWindows += 1
         const accountSet = await fetchAccountSet(accessUrl, window.startDate, window.endDate, window.simplefinAccountIds)
         const accountTransactionCounts = countTransactionsByAccount(accountSet)
-        const upsertResult = upsertAccountSet(accountSet)
+        const upsertResult = await upsertAccountSet(accountSet)
         for (const transactionId of upsertResult.transactionIds) {
           receivedTransactions.add(transactionId)
         }
@@ -181,7 +177,7 @@ async function runHistoricalBackfill(): Promise<SyncResult> {
           }
 
           account.cursor = window.startDate
-          updateAccountHistoryCursor(accountId, window.startDate)
+          await updateAccountHistoryCursor(accountId, window.startDate)
 
           const transactionCount = accountTransactionCounts.get(accountId) ?? 0
           account.emptyWindows = transactionCount === 0
@@ -195,7 +191,7 @@ async function runHistoricalBackfill(): Promise<SyncResult> {
       }
     }
 
-    categorizeStoredTransactions()
+    await categorizeStoredTransactions()
 
     const suffix = requestedWindows >= maxBackfillChunks
       ? ' Run history import again later to continue farther back if needed.'
@@ -209,21 +205,21 @@ async function runHistoricalBackfill(): Promise<SyncResult> {
       suffix,
     })
 
-    db.update(syncRuns).set({
+    await store.updateSyncRun(run.id, {
       status: 'success',
       finishedAt: unixNow(),
       message,
-    }).where(eq(syncRuns.id, run.id)).run()
+    })
 
     return { status: 'success', message }
   } catch (error) {
     const message = getSyncErrorMessage(error)
 
-    db.update(syncRuns).set({
+    await store.updateSyncRun(run.id, {
       status: 'failed',
       finishedAt: unixNow(),
       message,
-    }).where(eq(syncRuns.id, run.id)).run()
+    })
 
     return { status: 'failed', message }
   }
@@ -247,13 +243,12 @@ function getSyncErrorMessage(error: unknown) {
   return 'Sync failed unexpectedly.'
 }
 
-function getSyncStartDate() {
-  const db = getDb()
-  const row = db.select({
-    latest: sql<number | null>`max(${transactions.postedAt})`,
-  }).from(transactions).where(eq(transactions.pending, false)).get()
+async function getSyncStartDate() {
+  const latest = (await getStore().listTransactions())
+    .filter((transaction) => !transaction.pending)
+    .reduce<number | null>((current, transaction) => Math.max(current ?? 0, transaction.postedAt), null)
 
-  return getSyncStartDateFromLatest(row?.latest ?? null)
+  return getSyncStartDateFromLatest(latest)
 }
 
 export function summarizeSimpleFinMessages(messages: Array<string | undefined>) {
@@ -282,18 +277,26 @@ export function getSyncStartDateFromLatest(latestPostedAt: number | null, now = 
   return Math.max(0, now - initialSyncLookbackSeconds)
 }
 
-function getHistoricalBackfillAccounts() {
-  const db = getDb()
-  return db.select({
-    accountId: accounts.id,
-    connectionId: accounts.connectionId,
-    simplefinId: accounts.simplefinId,
-    historyCursor: accounts.historyCursor,
-    earliestPostedAt: sql<number | null>`min(case when ${transactions.pending} = 0 and ${transactions.postedAt} > 0 then ${transactions.postedAt} end)`,
-  }).from(accounts)
-    .leftJoin(transactions, eq(accounts.id, transactions.accountId))
-    .groupBy(accounts.id)
-    .all()
+async function getHistoricalBackfillAccounts() {
+  const store = getStore()
+  const accounts = await store.listAccounts()
+  const transactions = await store.listTransactions()
+  const byAccount = new Map<string, number | null>()
+  for (const transaction of transactions) {
+    if (transaction.pending || transaction.postedAt <= 0) {
+      continue
+    }
+    const current = byAccount.get(transaction.accountId)
+    byAccount.set(transaction.accountId, current == null ? transaction.postedAt : Math.min(current, transaction.postedAt))
+  }
+
+  return accounts.map((account): HistoricalBackfillAccount => ({
+    accountId: account.id,
+    connectionId: account.connectionId,
+    simplefinId: account.simplefinId,
+    historyCursor: account.historyCursor,
+    earliestPostedAt: byAccount.get(account.id) ?? null,
+  }))
 }
 
 export function createHistoricalBackfillStates(accounts: HistoricalBackfillAccount[], now = unixNow()) {
@@ -360,23 +363,20 @@ export function formatHistoricalImportMessage(input: {
   ].filter(Boolean).join(' ') + (suffix ?? '')
 }
 
-function updateAccountHistoryCursor(accountId: string, historyCursor: number) {
-  getDb().update(accounts).set({
-    historyCursor,
-    updatedAt: unixNow(),
-  }).where(eq(accounts.id, accountId)).run()
+async function updateAccountHistoryCursor(accountId: string, historyCursor: number) {
+  await getStore().updateAccountHistoryCursor(accountId, historyCursor, unixNow())
 }
 
-function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResult {
-  const db = getDb()
+async function upsertAccountSet(accountSet: SimpleFinAccountSet): Promise<UpsertAccountSetResult> {
+  const store = getStore()
   const now = unixNow()
-  const rules = db.select().from(categoryRules).orderBy(desc(categoryRules.createdAt)).all()
-  const categoryRows = db.select().from(categories).all()
+  const rules = await store.listCategoryRules()
+  const categoryRows = await store.listCategories()
   const transactionIds: string[] = []
   const insertedTransactionIds: string[] = []
 
   for (const connection of accountSet.connections) {
-    db.insert(connections).values({
+    await store.upsertConnection({
       id: connection.conn_id,
       name: connection.name,
       orgId: connection.org_id ?? null,
@@ -384,22 +384,12 @@ function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResu
       orgUrl: connection.org_url ?? null,
       simplefinUrl: connection.sfin_url ?? null,
       updatedAt: now,
-    }).onConflictDoUpdate({
-      target: connections.id,
-      set: {
-        name: connection.name,
-        orgId: connection.org_id ?? null,
-        orgName: connection.org_name ?? null,
-        orgUrl: connection.org_url ?? null,
-        simplefinUrl: connection.sfin_url ?? null,
-        updatedAt: now,
-      },
-    }).run()
+    })
   }
 
   for (const account of accountSet.accounts) {
-    const accountId = `${account.conn_id}:${account.id}`
-    db.insert(accounts).values({
+    const accountId = getAccountId(account.conn_id, account.id)
+    await store.upsertAccount({
       id: accountId,
       connectionId: account.conn_id,
       simplefinId: account.id,
@@ -408,22 +398,13 @@ function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResu
       balance: Number(account.balance),
       availableBalance: account['available-balance'] ? Number(account['available-balance']) : null,
       balanceDate: account['balance-date'],
+      historyCursor: null,
       updatedAt: now,
-    }).onConflictDoUpdate({
-      target: accounts.id,
-      set: {
-        name: account.name,
-        currency: account.currency,
-        balance: Number(account.balance),
-        availableBalance: account['available-balance'] ? Number(account['available-balance']) : null,
-        balanceDate: account['balance-date'],
-        updatedAt: now,
-      },
-    }).run()
+    })
 
     for (const transaction of account.transactions ?? []) {
       const transactionId = `${accountId}:${transaction.id}`
-      const existing = db.select().from(transactions).where(eq(transactions.id, transactionId)).get()
+      const existing = await store.getTransaction(transactionId)
       transactionIds.push(transactionId)
       if (!existing) {
         insertedTransactionIds.push(transactionId)
@@ -442,7 +423,7 @@ function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResu
             accountName: account.name,
           }, categoryRows, rules)
 
-      db.insert(transactions).values({
+      await store.upsertTransaction({
         id: transactionId,
         accountId,
         simplefinId: transaction.id,
@@ -459,24 +440,7 @@ function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResu
         normalizedMerchant: categorization.normalizedMerchant,
         raw: JSON.stringify(transaction),
         updatedAt: now,
-      }).onConflictDoUpdate({
-        target: transactions.id,
-        set: {
-          postedAt: transaction.posted,
-          transactedAt: transaction.transacted_at ?? null,
-          amount: Number(transaction.amount),
-          currency: account.currency,
-          description: transaction.description,
-          pending: transaction.pending ?? false,
-          categoryId: categorization.categoryId,
-          categorySource: categorization.categorySource,
-          categoryConfidence: categorization.categoryConfidence,
-          categoryReason: categorization.categoryReason,
-          normalizedMerchant: categorization.normalizedMerchant,
-          raw: JSON.stringify(transaction),
-          updatedAt: now,
-        },
-      }).run()
+      })
     }
   }
 
@@ -486,35 +450,36 @@ function upsertAccountSet(accountSet: SimpleFinAccountSet): UpsertAccountSetResu
   }
 }
 
-function categorizeStoredTransactions() {
-  const db = getDb()
-  const rules = db.select().from(categoryRules).orderBy(desc(categoryRules.createdAt)).all()
-  const categoryRows = db.select().from(categories).all()
-  const rows = db.select({
-    id: transactions.id,
-    description: transactions.description,
-    amount: transactions.amount,
-    accountName: accounts.name,
-  }).from(transactions)
-    .leftJoin(accounts, eq(transactions.accountId, accounts.id))
-    .where(sql`${transactions.categorySource} is null or ${transactions.categorySource} <> 'manual'`)
-    .all()
+async function categorizeStoredTransactions() {
+  const store = getStore()
+  const [rules, categoryRows, transactions, accounts] = await Promise.all([
+    store.listCategoryRules(),
+    store.listCategories(),
+    store.listTransactions(),
+    store.listAccounts(),
+  ])
+  const accountById = new Map(accounts.map((account: AccountRecord) => [account.id, account]))
+  const now = unixNow()
 
-  for (const row of rows) {
+  for (const row of transactions) {
+    if (row.categorySource === 'manual') {
+      continue
+    }
+
     const categorization = categorizeTransaction({
       description: row.description,
       amount: row.amount,
-      accountName: row.accountName,
+      accountName: accountById.get(row.accountId)?.name,
     }, categoryRows, rules)
 
-    db.update(transactions).set({
+    await store.updateTransaction(row.id, {
       categoryId: categorization.categoryId,
       categorySource: categorization.categorySource,
       categoryConfidence: categorization.categoryConfidence,
       categoryReason: categorization.categoryReason,
       normalizedMerchant: categorization.normalizedMerchant,
-      updatedAt: unixNow(),
-    }).where(eq(transactions.id, row.id)).run()
+      updatedAt: now,
+    })
   }
 }
 

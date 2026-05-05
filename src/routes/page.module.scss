@@ -3,6 +3,7 @@
 .page {
   display: grid;
   gap: 1.15rem;
+  min-width: 0;
 }
 
 .header {
@@ -10,6 +11,7 @@
   display: flex;
   gap: 1rem;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .kicker {
@@ -133,6 +135,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .button,
@@ -183,11 +186,14 @@
 
 .tableWrap {
   @include card;
-  overflow: visible;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .table {
   border-collapse: collapse;
+  min-width: 44rem;
   width: 100%;
 }
 
@@ -261,7 +267,7 @@
   display: grid;
   gap: 0.75rem;
   left: 0.75rem;
-  min-width: 17rem;
+  min-width: min(17rem, calc(100vw - 2rem));
   padding: 0.85rem;
   position: absolute;
   text-transform: none;
@@ -352,6 +358,7 @@
   gap: 0.5rem;
   min-height: 2rem;
   max-width: 13rem;
+  min-width: 0;
   padding: 0.28rem 0.7rem 0.28rem 0.42rem;
   transition: 150ms ease;
   white-space: nowrap;
@@ -404,6 +411,7 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .error {
@@ -417,9 +425,11 @@
 .chartHeader {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   justify-content: space-between;
   margin-bottom: 1rem;
+  min-width: 0;
 }
 
 .chartTitle {
@@ -442,6 +452,7 @@
 .legend {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 1.2rem;
   margin-bottom: 0.75rem;
 }
@@ -464,6 +475,7 @@
 
 .lineChart {
   height: 12rem;
+  min-width: 0;
   width: 100%;
 }
 
@@ -479,6 +491,7 @@
   aspect-ratio: 1;
   display: grid;
   justify-items: center;
+  margin-inline: auto;
   place-content: center;
   position: relative;
 }
@@ -558,6 +571,7 @@
 .billList {
   display: grid;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .categoryRow,
@@ -570,11 +584,41 @@
 }
 
 .categoryRow {
-  grid-template-columns: 0.55rem minmax(0, 1fr) max-content max-content;
+  grid-template-columns: 0.55rem minmax(0, 1fr) minmax(4.4rem, max-content) max-content;
+}
+
+.categoryRow > span {
+  min-width: 0;
+}
+
+.categoryRow .rowTitle {
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categoryRow > span:not(.rowTitle):not(.dot) {
+  white-space: nowrap;
 }
 
 .budgetRow {
   grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.clickableRow {
+  @include button-reset;
+  border-radius: 0.6rem;
+  color: inherit;
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+  transition: background 140ms ease, transform 140ms ease;
+  width: 100%;
+}
+
+.clickableRow:hover,
+.clickableRow:focus-visible {
+  background: #f7f4ff;
 }
 
 .budgetTrack {
@@ -599,7 +643,7 @@
 .transactionRow,
 .billRow {
   border-bottom: 1px solid $line;
-  grid-template-columns: 2rem minmax(0, 1fr) max-content;
+  grid-template-columns: 2rem minmax(0, 1fr) minmax(4.4rem, max-content);
   padding-bottom: 0.75rem;
 }
 
@@ -624,12 +668,16 @@
 .rowTitle {
   color: $ink;
   font-weight: 850;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rowMeta {
   color: $muted;
   font-size: 0.78rem;
   margin-top: 0.15rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .miniChart {
@@ -638,7 +686,7 @@
   width: 100%;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1700px) {
   .dashboardGrid,
   .lowerGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -650,6 +698,22 @@
 
   .panelGrid > :first-child {
     grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1900px) {
+  .donutWrap {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .categoryList {
+    justify-self: center;
+    width: min(100%, 34rem);
+  }
+
+  .donut {
+    max-width: 12rem;
   }
 }
 
@@ -676,7 +740,109 @@
     max-width: 12rem;
   }
 
+  .chartCard,
+  .card,
+  .metric,
   .tableWrap {
-    overflow-x: auto;
+    padding: 0.9rem;
+  }
+
+  .value {
+    font-size: 1.45rem;
+  }
+
+  .pagination {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .pagination > .field {
+    width: 100%;
+  }
+
+  .pagination .toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .page {
+    gap: 0.85rem;
+  }
+
+  .heading {
+    font-size: 1.35rem;
+  }
+
+  .kicker {
+    font-size: 0.82rem;
+  }
+
+  .button,
+  .secondaryButton {
+    min-height: 2.35rem;
+    padding: 0 0.75rem;
+  }
+
+  .chartCard,
+  .card,
+  .metric,
+  .tableWrap {
+    border-radius: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .chartHeader {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .donutSvg {
+    height: 9.5rem;
+    width: 9.5rem;
+  }
+
+  .donutCenter {
+    height: 5rem;
+    width: 5rem;
+  }
+
+  .donutCenter strong {
+    font-size: 1.02rem;
+  }
+
+  .categoryRow {
+    align-items: start;
+    grid-template-columns: 0.55rem minmax(0, 1fr) max-content;
+  }
+
+  .categoryRow .rowMeta {
+    grid-column: 2 / -1;
+    justify-self: end;
+  }
+
+  .budgetRow,
+  .transactionRow,
+  .billRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .transactionRow .merchantIcon,
+  .billRow .merchantIcon {
+    display: none;
+  }
+
+  .filterPopover {
+    left: 0;
+    right: auto;
+  }
+
+  .table th:last-child .filterPopover,
+  .table th:nth-last-child(2) .filterPopover {
+    left: auto;
+    right: 0;
   }
 }
