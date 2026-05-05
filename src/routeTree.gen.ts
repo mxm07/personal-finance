@@ -13,6 +13,8 @@ import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as GoogleAuthCallbackRouteImport } from './routes/google-auth-callback'
+import { Route as GoogleAuthRouteImport } from './routes/google-auth'
 import { Route as CategoriesRouteImport } from './routes/categories'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +39,16 @@ const LogoutRoute = LogoutRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoogleAuthCallbackRoute = GoogleAuthCallbackRouteImport.update({
+  id: '/google-auth-callback',
+  path: '/google-auth-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoogleAuthRoute = GoogleAuthRouteImport.update({
+  id: '/google-auth',
+  path: '/google-auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CategoriesRoute = CategoriesRouteImport.update({
@@ -69,6 +81,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/categories': typeof CategoriesRoute
+  '/google-auth': typeof GoogleAuthRoute
+  '/google-auth-callback': typeof GoogleAuthCallbackRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/setup': typeof SetupRoute
@@ -80,6 +94,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/categories': typeof CategoriesRoute
+  '/google-auth': typeof GoogleAuthRoute
+  '/google-auth-callback': typeof GoogleAuthCallbackRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/setup': typeof SetupRoute
@@ -92,6 +108,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/categories': typeof CategoriesRoute
+  '/google-auth': typeof GoogleAuthRoute
+  '/google-auth-callback': typeof GoogleAuthCallbackRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/setup': typeof SetupRoute
@@ -105,6 +123,8 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/categories'
+    | '/google-auth'
+    | '/google-auth-callback'
     | '/login'
     | '/logout'
     | '/setup'
@@ -116,6 +136,8 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/categories'
+    | '/google-auth'
+    | '/google-auth-callback'
     | '/login'
     | '/logout'
     | '/setup'
@@ -127,6 +149,8 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/categories'
+    | '/google-auth'
+    | '/google-auth-callback'
     | '/login'
     | '/logout'
     | '/setup'
@@ -139,6 +163,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountsRoute: typeof AccountsRoute
   CategoriesRoute: typeof CategoriesRoute
+  GoogleAuthRoute: typeof GoogleAuthRoute
+  GoogleAuthCallbackRoute: typeof GoogleAuthCallbackRoute
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   SetupRoute: typeof SetupRoute
@@ -174,6 +200,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/google-auth-callback': {
+      id: '/google-auth-callback'
+      path: '/google-auth-callback'
+      fullPath: '/google-auth-callback'
+      preLoaderRoute: typeof GoogleAuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/google-auth': {
+      id: '/google-auth'
+      path: '/google-auth'
+      fullPath: '/google-auth'
+      preLoaderRoute: typeof GoogleAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/categories': {
@@ -230,6 +270,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsRoute: AccountsRoute,
   CategoriesRoute: CategoriesRoute,
+  GoogleAuthRoute: GoogleAuthRoute,
+  GoogleAuthCallbackRoute: GoogleAuthCallbackRoute,
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   SetupRoute: SetupRoute,

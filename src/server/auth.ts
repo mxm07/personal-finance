@@ -168,7 +168,7 @@ function getGoogleAuthConfig() {
     clientId,
     clientSecret,
     allowedEmails,
-    redirectUri: new URL('/auth/google/callback', getBaseUrl()).toString(),
+    redirectUri: new URL('/google-auth-callback', getBaseUrl()).toString(),
   }
 }
 

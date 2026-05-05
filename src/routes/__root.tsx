@@ -30,6 +30,8 @@ export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
     if (
       location.pathname === "/login" ||
+      location.pathname === "/google-auth" ||
+      location.pathname === "/google-auth-callback" ||
       location.pathname.startsWith("/auth/")
     ) {
       return { user: null };

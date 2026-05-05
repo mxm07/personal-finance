@@ -17,8 +17,8 @@ function LoginPage() {
   const search = Route.useSearch()
   const configured = data.auth.configured
   const signInHref = search.redirect
-    ? `/auth/google?redirect=${encodeURIComponent(search.redirect)}`
-    : '/auth/google'
+    ? `/google-auth?redirect=${encodeURIComponent(search.redirect)}`
+    : '/google-auth'
 
   return (
     <main className={styles.page}>
