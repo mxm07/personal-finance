@@ -297,10 +297,29 @@ function sanitizeRedirectPath(value: string | null) {
 }
 
 function redirectResponse(location: string) {
-  return new Response(null, {
-    status: 302,
+  return new Response(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="0;url=${escapeHtmlAttribute(location)}">
+    <title>Redirecting</title>
+    <script>location.replace(${JSON.stringify(location)})</script>
+  </head>
+  <body>
+    <a href="${escapeHtmlAttribute(location)}">Continue</a>
+  </body>
+</html>`, {
+    status: 200,
     headers: {
-      Location: location,
+      'Content-Type': 'text/html; charset=utf-8',
     },
   })
+}
+
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
 }
