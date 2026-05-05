@@ -117,7 +117,7 @@ class AppStore {
 
   constructor() {
     this.rawClient = new DynamoDBClient({
-      region: process.env.AWS_REGION ?? 'us-east-1',
+      region: process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? 'us-east-1',
       endpoint: process.env.DYNAMODB_ENDPOINT || undefined,
       credentials: process.env.DYNAMODB_ENDPOINT
         ? {

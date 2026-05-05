@@ -15,7 +15,7 @@ const sqlitePath = process.env.SQLITE_PATH ?? path.join(root, '.data', 'finance.
 const secretPath = process.env.SIMPLEFIN_SECRET_PATH ?? path.join(root, '.data', 'simplefin.secret.json')
 const tableName = process.env.DYNAMODB_TABLE_NAME ?? 'personal-finance-dev'
 const endpoint = process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000'
-const region = process.env.AWS_REGION ?? 'us-east-1'
+const region = process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? 'us-east-1'
 
 const rawClient = new DynamoDBClient({
   region,
