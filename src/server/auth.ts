@@ -34,7 +34,8 @@ const sessionName = 'pf_session'
 const stateBytes = 32
 
 export async function getAuthenticatedUser() {
-  if (!process.env.SESSION_PASSWORD || process.env.SESSION_PASSWORD.length < 32) {
+  const sessionPassword = getConfigValue('SESSION_PASSWORD')
+  if (!sessionPassword || sessionPassword.length < 32) {
     return null
   }
   const session = await getAuthSession()
@@ -125,15 +126,19 @@ export async function signOut() {
 }
 
 export function getAuthStatus() {
+  const checks = getAuthConfigChecks()
   const configured = Boolean(
-    process.env.GOOGLE_CLIENT_ID &&
-    process.env.GOOGLE_CLIENT_SECRET &&
-    getAllowedEmails().length &&
-    process.env.SESSION_PASSWORD,
+    checks.googleClientId &&
+    checks.googleClientSecret &&
+    checks.allowedEmails &&
+    checks.sessionPassword,
   )
   return {
     configured,
     allowedEmails: getAllowedEmails(),
+    missing: Object.entries(checks)
+      .filter(([, present]) => !present)
+      .map(([name]) => name),
   }
 }
 
@@ -152,8 +157,8 @@ function getAuthSession() {
 }
 
 function getGoogleAuthConfig() {
-  const clientId = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  const clientId = getConfigValue('GOOGLE_CLIENT_ID')
+  const clientSecret = getConfigValue('GOOGLE_CLIENT_SECRET')
   const allowedEmails = getAllowedEmails()
   if (!clientId || !clientSecret || !allowedEmails.length) {
     throw new Error('Google auth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_ALLOWED_EMAILS.')
@@ -168,7 +173,7 @@ function getGoogleAuthConfig() {
 }
 
 function getAllowedEmails() {
-  const value = process.env.GOOGLE_ALLOWED_EMAILS ?? process.env.GOOGLE_ALLOWED_EMAIL ?? ''
+  const value = getConfigValue('GOOGLE_ALLOWED_EMAILS') ?? getConfigValue('GOOGLE_ALLOWED_EMAIL') ?? ''
   return [...new Set(value
     .split(',')
     .map((email) => email.trim().toLocaleLowerCase())
@@ -176,7 +181,7 @@ function getAllowedEmails() {
 }
 
 function getSessionPassword() {
-  const password = process.env.SESSION_PASSWORD
+  const password = getConfigValue('SESSION_PASSWORD')
   if (!password || password.length < 32) {
     throw new Error('SESSION_PASSWORD must be set to at least 32 characters.')
   }
@@ -184,13 +189,48 @@ function getSessionPassword() {
 }
 
 function getBaseUrl() {
-  const configured = process.env.APP_BASE_URL
+  const configured = getConfigValue('APP_BASE_URL')
   if (configured) {
     return configured
   }
 
   const requestUrl = getRequestUrl({ xForwardedHost: true })
   return `${requestUrl.protocol}//${requestUrl.host}`
+}
+
+function getAuthConfigChecks() {
+  return {
+    googleClientId: Boolean(getConfigValue('GOOGLE_CLIENT_ID')),
+    googleClientSecret: Boolean(getConfigValue('GOOGLE_CLIENT_SECRET')),
+    allowedEmails: getAllowedEmails().length > 0,
+    sessionPassword: Boolean(getConfigValue('SESSION_PASSWORD')),
+  }
+}
+
+function getConfigValue(name: string) {
+  return process.env[name] ?? getAmplifySecretValue(name)
+}
+
+function getAmplifySecretValue(name: string) {
+  const secrets = parseAmplifySecrets()
+  const value = secrets[name]
+  return typeof value === 'string' ? value : undefined
+}
+
+function parseAmplifySecrets(): Record<string, unknown> {
+  const raw = process.env.secrets
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
 }
 
 async function exchangeCodeForToken(code: string, config: ReturnType<typeof getGoogleAuthConfig>) {

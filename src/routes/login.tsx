@@ -39,7 +39,7 @@ function LoginPage() {
         {!configured ? (
           <div className={styles.notice}>
             <strong>Authentication is not configured.</strong>
-            <span>Set Google OAuth environment variables before hosting this app.</span>
+            <span>{formatMissingAuthConfig(data.auth.missing)}</span>
           </div>
         ) : (
           <a className={styles.googleButton} href={signInHref}>
@@ -54,6 +54,14 @@ function LoginPage() {
       </section>
     </main>
   )
+}
+
+function formatMissingAuthConfig(missing: string[] | undefined) {
+  if (!missing?.length) {
+    return 'Set Google OAuth environment variables before hosting this app.'
+  }
+
+  return `Missing server config: ${missing.join(', ')}.`
 }
 
 function formatLoginError(error: string) {

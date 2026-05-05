@@ -22,6 +22,27 @@ const runtimeEnvNames = [
   "SIMPLEFIN_BACKFILL_CHUNKS",
   "SIMPLE_FIN_KEY",
 ];
+const amplifySecrets = parseJsonObject(process.env.secrets);
+
+function getBuildEnvValue(name) {
+  const value = process.env[name] ?? amplifySecrets[name];
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseJsonObject(value) {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
 
 await rm(hostingDir, { force: true, recursive: true });
 await mkdir(computeDir, { recursive: true });
@@ -62,6 +83,26 @@ function loadRuntimeEnv() {
     const key = trimmed.slice(0, separator);
     const value = trimmed.slice(separator + 1);
     process.env[key] ??= Buffer.from(value, "base64").toString("utf8");
+  }
+}
+
+function loadAmplifySecrets() {
+  let secrets = {};
+
+  try {
+    secrets = JSON.parse(process.env.secrets ?? "{}");
+  } catch {
+    return;
+  }
+
+  if (!secrets || typeof secrets !== "object" || Array.isArray(secrets)) {
+    return;
+  }
+
+  for (const [key, value] of Object.entries(secrets)) {
+    if (typeof value === "string") {
+      process.env[key] ??= value;
+    }
   }
 }
 
@@ -109,6 +150,7 @@ function writeHeaders(response, outgoing) {
 }
 
 loadRuntimeEnv();
+loadAmplifySecrets();
 const startServer = (await import("./dist/server/server.js")).default;
 
 http
@@ -154,13 +196,18 @@ await writeFile(
   join(computeDir, ".env.runtime"),
   runtimeEnvNames
     .flatMap((name) => {
-      const value = process.env[name];
+      const value = getBuildEnvValue(name);
       return value === undefined
         ? []
         : [`${name}=${Buffer.from(value, "utf8").toString("base64")}`];
     })
     .join("\n"),
 );
+
+const presentRuntimeEnvNames = runtimeEnvNames.filter((name) => getBuildEnvValue(name) !== undefined);
+const missingRuntimeEnvNames = runtimeEnvNames.filter((name) => getBuildEnvValue(name) === undefined);
+console.log(`Amplify runtime env captured: ${presentRuntimeEnvNames.join(", ") || "none"}`);
+console.log(`Amplify runtime env missing: ${missingRuntimeEnvNames.join(", ") || "none"}`);
 
 await writeFile(
   join(computeDir, "package.json"),
