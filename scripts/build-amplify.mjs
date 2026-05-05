@@ -22,6 +22,12 @@ const runtimeEnvNames = [
   "SIMPLEFIN_BACKFILL_CHUNKS",
   "SIMPLE_FIN_KEY",
 ];
+const requiredAuthEnvNames = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_ALLOWED_EMAILS",
+  "SESSION_PASSWORD",
+];
 const amplifySecrets = parseJsonObject(process.env.secrets);
 
 function getBuildEnvValue(name) {
@@ -206,8 +212,16 @@ await writeFile(
 
 const presentRuntimeEnvNames = runtimeEnvNames.filter((name) => getBuildEnvValue(name) !== undefined);
 const missingRuntimeEnvNames = runtimeEnvNames.filter((name) => getBuildEnvValue(name) === undefined);
+const missingRequiredAuthEnvNames = requiredAuthEnvNames.filter((name) => getBuildEnvValue(name) === undefined);
 console.log(`Amplify runtime env captured: ${presentRuntimeEnvNames.join(", ") || "none"}`);
 console.log(`Amplify runtime env missing: ${missingRuntimeEnvNames.join(", ") || "none"}`);
+
+if (process.env.AWS_BRANCH && missingRequiredAuthEnvNames.length > 0) {
+  throw new Error(
+    `Amplify build is missing required auth config: ${missingRequiredAuthEnvNames.join(", ")}. ` +
+      "Add these as branch environment variables for this Amplify Hosting branch, then redeploy.",
+  );
+}
 
 await writeFile(
   join(computeDir, "package.json"),

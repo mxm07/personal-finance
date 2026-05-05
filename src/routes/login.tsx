@@ -61,7 +61,7 @@ function formatMissingAuthConfig(missing: string[] | undefined) {
     return 'Set Google OAuth environment variables before hosting this app.'
   }
 
-  return `Missing server config: ${missing.join(', ')}.`
+  return `Missing or invalid server config: ${missing.join(', ')}.`
 }
 
 function formatLoginError(error: string) {

@@ -203,8 +203,12 @@ function getAuthConfigChecks() {
     googleClientId: Boolean(getConfigValue('GOOGLE_CLIENT_ID')),
     googleClientSecret: Boolean(getConfigValue('GOOGLE_CLIENT_SECRET')),
     allowedEmails: getAllowedEmails().length > 0,
-    sessionPassword: Boolean(getConfigValue('SESSION_PASSWORD')),
+    sessionPassword: isValidSessionPassword(getConfigValue('SESSION_PASSWORD')),
   }
+}
+
+function isValidSessionPassword(value: string | undefined) {
+  return Boolean(value && value.length >= 32)
 }
 
 function getConfigValue(name: string) {
