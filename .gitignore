@@ -3,6 +3,7 @@
 .env.local
 .output/
 .tanstack/
+.amplify-hosting/
 dist/
 node_modules/
 *.log

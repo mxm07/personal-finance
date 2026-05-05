@@ -7,6 +7,8 @@
     "db:local": "docker compose up -d dynamodb",
     "dev": "vite dev",
     "build": "vite build",
+    "build:amplify": "npm run build && node scripts/build-amplify.mjs",
+    "start": "vite preview --host 0.0.0.0 --port 3000",
     "migrate:sqlite": "node scripts/migrate-sqlite-to-dynamo.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
