@@ -10,6 +10,18 @@ const hostingDir = join(rootDir, ".amplify-hosting");
 const computeDir = join(hostingDir, "compute", "default");
 const staticDir = join(hostingDir, "static");
 const packageJson = require("../package.json");
+const runtimeEnvNames = [
+  "APP_AWS_REGION",
+  "APP_BASE_URL",
+  "DYNAMODB_TABLE_NAME",
+  "GOOGLE_ALLOWED_EMAIL",
+  "GOOGLE_ALLOWED_EMAILS",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "SESSION_PASSWORD",
+  "SIMPLEFIN_BACKFILL_CHUNKS",
+  "SIMPLE_FIN_KEY",
+];
 
 await rm(hostingDir, { force: true, recursive: true });
 await mkdir(computeDir, { recursive: true });
@@ -19,10 +31,39 @@ await cp(join(rootDir, "dist"), join(computeDir, "dist"), { recursive: true });
 
 await writeFile(
   join(computeDir, "server.mjs"),
-  `import http from "node:http";
-import startServer from "./dist/server/server.js";
+  `import { readFileSync } from "node:fs";
+import http from "node:http";
 
 const port = Number(process.env.PORT ?? 3000);
+
+function loadRuntimeEnv() {
+  let content = "";
+
+  try {
+    content = readFileSync(new URL(".env.runtime", import.meta.url), "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+    return;
+  }
+
+  for (const line of content.split("\\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separator = trimmed.indexOf("=");
+    if (separator === -1) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separator);
+    const value = trimmed.slice(separator + 1);
+    process.env[key] ??= Buffer.from(value, "base64").toString("utf8");
+  }
+}
 
 function requestBody(request) {
   if (request.method === "GET" || request.method === "HEAD") {
@@ -67,6 +108,9 @@ function writeHeaders(response, outgoing) {
   }
 }
 
+loadRuntimeEnv();
+const startServer = (await import("./dist/server/server.js")).default;
+
 http
   .createServer(async (incoming, outgoing) => {
     try {
@@ -104,6 +148,18 @@ http
     console.log(\`server is listening on \${port}\`);
   });
 `,
+);
+
+await writeFile(
+  join(computeDir, ".env.runtime"),
+  runtimeEnvNames
+    .flatMap((name) => {
+      const value = process.env[name];
+      return value === undefined
+        ? []
+        : [`${name}=${Buffer.from(value, "utf8").toString("base64")}`];
+    })
+    .join("\n"),
 );
 
 await writeFile(
