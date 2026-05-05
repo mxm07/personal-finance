@@ -131,7 +131,8 @@ export function getAuthStatus() {
     checks.googleClientId &&
     checks.googleClientSecret &&
     checks.allowedEmails &&
-    checks.sessionPassword,
+    checks.sessionPassword &&
+    checks.appBaseUrl,
   )
   return {
     configured,
@@ -191,7 +192,7 @@ function getSessionPassword() {
 function getBaseUrl() {
   const configured = getConfigValue('APP_BASE_URL')
   if (configured) {
-    return configured
+    return normalizeBaseUrl(configured)
   }
 
   const requestUrl = getRequestUrl({ xForwardedHost: true })
@@ -204,6 +205,7 @@ function getAuthConfigChecks() {
     googleClientSecret: Boolean(getConfigValue('GOOGLE_CLIENT_SECRET')),
     allowedEmails: getAllowedEmails().length > 0,
     sessionPassword: isValidSessionPassword(getConfigValue('SESSION_PASSWORD')),
+    appBaseUrl: isValidBaseUrl(getConfigValue('APP_BASE_URL')),
   }
 }
 
@@ -212,7 +214,12 @@ function isValidSessionPassword(value: string | undefined) {
 }
 
 function getConfigValue(name: string) {
-  return process.env[name] ?? getAmplifySecretValue(name)
+  const value = process.env[name] ?? getAmplifySecretValue(name)
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const trimmed = value.trim()
+  return trimmed.replace(/^(['"])(.*)\1$/, '$2')
 }
 
 function getAmplifySecretValue(name: string) {
@@ -235,6 +242,37 @@ function parseAmplifySecrets(): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+function isValidBaseUrl(value: string | undefined) {
+  if (!value) {
+    return true
+  }
+
+  try {
+    normalizeBaseUrl(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function normalizeBaseUrl(value: string) {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error('APP_BASE_URL must be a valid absolute URL.')
+  }
+
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
+    throw new Error('APP_BASE_URL must use https outside localhost.')
+  }
+
+  url.pathname = url.pathname.replace(/\/+$/, '')
+  url.search = ''
+  url.hash = ''
+  return url.toString()
 }
 
 async function exchangeCodeForToken(code: string, config: ReturnType<typeof getGoogleAuthConfig>) {
