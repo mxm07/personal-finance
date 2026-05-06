@@ -18,9 +18,9 @@ export const Route = createFileRoute('/')({
 function OverviewPage() {
   const data = Route.useLoaderData()
   const router = useRouter()
-  const [incomeRange, setIncomeRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
-  const [spendingRange, setSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
-  const [topSpendingRange, setTopSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange())
+  const [incomeRange, setIncomeRange] = useState<TimeRangeValue>(() => getDefaultTimeRange(data.asOfDate))
+  const [spendingRange, setSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange(data.asOfDate))
+  const [topSpendingRange, setTopSpendingRange] = useState<TimeRangeValue>(() => getDefaultTimeRange(data.asOfDate))
   const incomeChartData = buildChartData(data.chartTransactions, incomeRange)
   const spendingChartData = buildChartData(data.chartTransactions, spendingRange)
   const topSpendingChartData = buildChartData(data.chartTransactions, topSpendingRange)
@@ -32,11 +32,6 @@ function OverviewPage() {
   }))
   const topSpendingRows = topSpendingChartData.spendingByCategory.slice(0, 5)
   const accountBalanceRows = data.accountBalances.slice(0, 6)
-  const today = new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date())
   const openTransactionsForCategory = (range: TimeRangeValue, item: CategoryBreakdownRow) => {
     const bounds = getTimeRangeBounds(range)
 
@@ -58,7 +53,7 @@ function OverviewPage() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.heading}>Financial overview</h1>
-          <p className={styles.kicker}>Here is your financial overview for {today}</p>
+          <p className={styles.kicker}>Here is your financial overview for {data.asOfLabel}</p>
         </div>
         <SyncButton />
       </header>

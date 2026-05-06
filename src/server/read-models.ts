@@ -15,6 +15,7 @@ export async function getDashboardData() {
   const accountList = await getAccountList()
   const transactions = await getTransactionsWithRelations()
   const start = monthStart()
+  const asOfDate = toDateKey(new Date())
   const cashFlowRows = transactions
     .filter((transaction) => transaction.postedAt >= start)
     .map((transaction) => ({
@@ -30,6 +31,8 @@ export async function getDashboardData() {
     .sort((a, b) => a.postedAt - b.postedAt)
 
   return {
+    asOfDate,
+    asOfLabel: formatDisplayDate(asOfDate),
     balances: summarizeBalances(accountRows.map((account) => ({
       currency: account.currency,
       balance: account.balance,
@@ -372,4 +375,12 @@ function toDateKey(date: Date) {
   const day = String(date.getDate()).padStart(2, '0')
 
   return `${year}-${month}-${day}`
+}
+
+function formatDisplayDate(date: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(`${date}T00:00:00`))
 }

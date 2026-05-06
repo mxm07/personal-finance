@@ -1,24 +1,24 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { ShieldCheck } from 'lucide-react'
-import { getCurrentUser } from '../server-functions'
-import styles from './login.module.scss'
+import { createFileRoute } from "@tanstack/react-router";
+import { ShieldCheck } from "lucide-react";
+import { getCurrentUser } from "../server-functions";
+import styles from "./login.module.scss";
 
-export const Route = createFileRoute('/login')({
+export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>) => ({
-    error: typeof search.error === 'string' ? search.error : undefined,
-    redirect: typeof search.redirect === 'string' ? search.redirect : undefined,
+    error: typeof search.error === "string" ? search.error : undefined,
+    redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
   loader: () => getCurrentUser(),
   component: LoginPage,
-})
+});
 
 function LoginPage() {
-  const data = Route.useLoaderData()
-  const search = Route.useSearch()
-  const configured = data.auth.configured
+  const data = Route.useLoaderData();
+  const search = Route.useSearch();
+  const configured = data.auth.configured;
   const signInHref = search.redirect
     ? `/google-auth?redirect=${encodeURIComponent(search.redirect)}`
-    : '/google-auth'
+    : "/google-auth";
 
   return (
     <main className={styles.page}>
@@ -47,32 +47,30 @@ function LoginPage() {
             Sign in with Google
           </a>
         )}
-
-        {data.auth.allowedEmails.length ? (
-          <p className={styles.allowed}>Allowed accounts: {data.auth.allowedEmails.join(', ')}</p>
-        ) : null}
       </section>
     </main>
-  )
+  );
 }
 
 function formatMissingAuthConfig(missing: string[] | undefined) {
   if (!missing?.length) {
-    return 'Set Google OAuth environment variables before hosting this app.'
+    return "Set Google OAuth environment variables before hosting this app.";
   }
 
-  return `Missing or invalid server config: ${missing.join(', ')}.`
+  return `Missing or invalid server config: ${missing.join(", ")}.`;
 }
 
 function formatLoginError(error: string) {
   const messages: Record<string, string> = {
-    access_denied: 'Google sign-in was cancelled.',
-    email_not_verified: 'This Google account does not have a verified email address.',
-    invalid_oauth_state: 'The sign-in request expired. Try again.',
-    invalid_id_token: 'Google could not verify the identity token.',
-    missing_id_token: 'Google did not return an identity token.',
-    missing_oauth_response: 'Google did not return the expected sign-in response.',
-    unauthorized_email: 'That Google account is not allowed for this app.',
-  }
-  return messages[error] ?? 'Sign-in failed. Try again.'
+    access_denied: "Google sign-in was cancelled.",
+    email_not_verified:
+      "This Google account does not have a verified email address.",
+    invalid_oauth_state: "The sign-in request expired. Try again.",
+    invalid_id_token: "Google could not verify the identity token.",
+    missing_id_token: "Google did not return an identity token.",
+    missing_oauth_response:
+      "Google did not return the expected sign-in response.",
+    unauthorized_email: "That Google account is not allowed for this app.",
+  };
+  return messages[error] ?? "Sign-in failed. Try again.";
 }

@@ -18,11 +18,10 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
-  redirect,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import { getCurrentUser } from "../server-functions";
+import { requirePageAuthenticatedUser } from "../server-functions";
 import "../styles/global.scss";
 import styles from "./__root.module.scss";
 
@@ -37,17 +36,9 @@ export const Route = createRootRoute({
       return { user: null };
     }
 
-    const { user } = await getCurrentUser();
-    if (!user) {
-      throw redirect({
-        to: "/login",
-        search: {
-          error: undefined,
-          redirect: location.href,
-        },
-      });
-    }
-
+    const user = await requirePageAuthenticatedUser({
+      data: { redirectTo: location.href },
+    });
     return { user };
   },
   head: () => ({
@@ -55,6 +46,9 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Personal Finance" },
+    ],
+    links: [
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
   }),
   component: RootComponent,

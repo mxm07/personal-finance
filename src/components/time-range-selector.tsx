@@ -129,8 +129,8 @@ export function TimeRangePicker({
   )
 }
 
-export function getDefaultTimeRange(): TimeRangeValue {
-  return resolvePresetRange('month')
+export function getDefaultTimeRange(asOfDate?: string): TimeRangeValue {
+  return resolvePresetRange('month', undefined, asOfDate)
 }
 
 export function getTimeRangeBounds(value: TimeRangeValue) {
@@ -154,17 +154,19 @@ export function formatTimeRangeLabel(value: TimeRangeValue) {
   return `${formatShortDate(value.startDate)} - ${formatShortDate(value.endDate)}`
 }
 
-function resolvePresetRange(preset: TimeRangePreset, current?: TimeRangeValue): TimeRangeValue {
+function resolvePresetRange(preset: TimeRangePreset, current?: TimeRangeValue, asOfDate?: string): TimeRangeValue {
+  const today = asOfDate ? parseInputDate(asOfDate) : new Date()
+
   if (preset === 'custom') {
     return {
       preset,
-      startDate: current?.startDate ?? toInputDate(shiftDate(new Date(), -30)),
-      endDate: current?.endDate ?? toInputDate(new Date()),
+      startDate: current?.startDate ?? toInputDate(shiftDate(today, -30)),
+      endDate: current?.endDate ?? toInputDate(today),
     }
   }
 
-  const end = startOfDay(new Date())
-  const start = startOfDay(new Date())
+  const end = startOfDay(today)
+  const start = startOfDay(today)
   const daysBackByPreset: Record<Exclude<TimeRangePreset, 'custom'>, number> = {
     day: 0,
     week: 6,

@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { redirect } from '@tanstack/react-router'
-import { getRequestUrl, useSession } from '@tanstack/react-start/server'
+import { getRequestUrl, setResponseStatus, useSession } from '@tanstack/react-start/server'
 
 type AuthSessionData = {
   user?: {
@@ -42,10 +42,25 @@ export async function getAuthenticatedUser() {
   return session.data.user ?? null
 }
 
-export async function requireAuthenticatedUser() {
+export async function requireAuthenticatedUserForPage(redirectTo?: string) {
   const user = await getAuthenticatedUser()
   if (!user) {
-    throw redirect({ to: '/login', search: { error: undefined, redirect: undefined } })
+    throw redirect({
+      to: '/login',
+      search: {
+        error: undefined,
+        redirect: redirectTo,
+      },
+    })
+  }
+  return user
+}
+
+export async function requireAuthenticatedUserForServerFn() {
+  const user = await getAuthenticatedUser()
+  if (!user) {
+    setResponseStatus(401, 'Unauthorized')
+    throw new Error('Authentication required.')
   }
   return user
 }
