@@ -303,14 +303,14 @@ function TransactionsPage() {
           <tbody>
             {data.transactions.rows.map((transaction) => (
               <tr key={transaction.id}>
-                <td>{formatDate(transaction.postedAt)}</td>
-                <td>
+                <td data-label="Date">{formatDate(transaction.postedAt)}</td>
+                <td data-label="Description">
                   {transaction.description}
                   {transaction.pending ? <span className={styles.pill}>Pending</span> : null}
                 </td>
-                <td>{transaction.accountName}</td>
-                <td>{transaction.connectionName}</td>
-                <td>
+                <td data-label="Account">{transaction.accountName}</td>
+                <td data-label="Institution">{transaction.connectionName}</td>
+                <td data-label="Category">
                   {editingCategoryFor === transaction.id ? (
                     <select
                       autoFocus
@@ -344,13 +344,13 @@ function TransactionsPage() {
                     />
                   )}
                 </td>
-                <td className={transaction.amount < 0 ? styles.negative : styles.positive}>
+                <td data-label="Amount" className={transaction.amount < 0 ? styles.negative : styles.positive}>
                   {formatMoney(transaction.amount, transaction.currency)}
                 </td>
               </tr>
             ))}
             {!data.transactions.rows.length ? (
-              <tr><td colSpan={6}>No matching transactions.</td></tr>
+              <tr className={styles.emptyTableRow}><td colSpan={6}>No matching transactions.</td></tr>
             ) : null}
           </tbody>
         </table>

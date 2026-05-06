@@ -1,6 +1,7 @@
 import { readAccessUrl } from './secret'
 import { ensureStartupSync } from './sync'
 import { summarizeBalances, summarizeCashFlow } from './finance/calculations'
+import { getAnalyticsExcludedTransactionIds } from './finance/reporting'
 import { getStore, type AccountRecord, type TransactionRecord } from './storage/store'
 
 const monthStart = () => {
@@ -14,6 +15,7 @@ export async function getDashboardData() {
   const accountRows = await store.listAccounts()
   const accountList = await getAccountList()
   const transactions = await getTransactionsWithRelations()
+  const analyticsExcludedTransactionIds = getAnalyticsExcludedTransactionIds(transactions)
   const start = monthStart()
   const asOfDate = toDateKey(new Date())
   const cashFlowRows = transactions
@@ -22,12 +24,13 @@ export async function getDashboardData() {
       currency: transaction.currency,
       amount: transaction.amount,
       pending: transaction.pending,
+      excludeFromAnalytics: analyticsExcludedTransactionIds.has(transaction.id),
     }))
   const monthTransactionRows = transactions
     .filter((transaction) => transaction.postedAt >= start)
-    .map(toChartTransaction)
+    .map((transaction) => toChartTransaction(transaction, analyticsExcludedTransactionIds))
   const chartTransactions = transactions
-    .map(toChartTransaction)
+    .map((transaction) => toChartTransaction(transaction, analyticsExcludedTransactionIds))
     .sort((a, b) => a.postedAt - b.postedAt)
 
   return {
@@ -225,14 +228,19 @@ async function getTransactionsWithRelations() {
   })
 }
 
-function toChartTransaction(transaction: TransactionRecord & { categoryName: string | null }) {
+function toChartTransaction(
+  transaction: TransactionRecord & { categoryName: string | null },
+  analyticsExcludedTransactionIds: Set<string>,
+) {
   return {
+    id: transaction.id,
     postedAt: transaction.postedAt,
     amount: transaction.amount,
     currency: transaction.currency,
     pending: transaction.pending,
     categoryId: transaction.categoryId,
     categoryName: transaction.categoryName,
+    excludeFromAnalytics: analyticsExcludedTransactionIds.has(transaction.id),
   }
 }
 
@@ -289,8 +297,9 @@ function buildDailyCashFlow(rows: Array<{
   amount: number
   currency: string
   pending: boolean
+  excludeFromAnalytics: boolean
 }>) {
-  const posted = rows.filter((row) => !row.pending)
+  const posted = rows.filter((row) => !row.pending && !row.excludeFromAnalytics)
   const currency = posted[0]?.currency ?? rows[0]?.currency ?? 'USD'
   const today = new Date()
   const daysInMonth = today.getDate()
@@ -332,11 +341,12 @@ function buildSpendingByCategory(rows: Array<{
   currency: string
   pending: boolean
   categoryName: string | null
+  excludeFromAnalytics: boolean
 }>) {
   const totals = new Map<string, { name: string; amount: number; currency: string }>()
 
   for (const row of rows) {
-    if (row.pending || row.amount >= 0) {
+    if (row.pending || row.excludeFromAnalytics || row.amount >= 0) {
       continue
     }
 

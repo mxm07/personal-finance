@@ -359,12 +359,14 @@ function SyncButton() {
 }
 
 type ChartTransaction = {
+  id: string
   postedAt: number
   amount: number
   currency: string
   pending: boolean
   categoryId: number | null
   categoryName: string | null
+  excludeFromAnalytics: boolean
 }
 
 type CategoryBreakdownRow = {
@@ -383,6 +385,7 @@ function buildChartData(transactions: ChartTransaction[], range: TimeRangeValue)
   const bounds = getTimeRangeBounds(range)
   const rows = transactions.filter((transaction) => (
     !transaction.pending
+    && !transaction.excludeFromAnalytics
     && transaction.postedAt >= bounds.startEpoch
     && transaction.postedAt <= bounds.endEpoch
   ))

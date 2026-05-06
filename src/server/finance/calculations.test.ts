@@ -22,4 +22,14 @@ describe('finance calculations', () => {
       { currency: 'USD', moneyIn: 100, moneyOut: 35.5, net: 64.5 },
     ])
   })
+
+  it('excludes transactions marked as analytics-only internal transfers', () => {
+    expect(summarizeCashFlow([
+      { currency: 'USD', amount: 1000, excludeFromAnalytics: true },
+      { currency: 'USD', amount: -1000, excludeFromAnalytics: true },
+      { currency: 'USD', amount: -35.5 },
+    ])).toEqual([
+      { currency: 'USD', moneyIn: 0, moneyOut: 35.5, net: -35.5 },
+    ])
+  })
 })

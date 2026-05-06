@@ -331,6 +331,11 @@
   border-bottom: 0;
 }
 
+.emptyTableRow td {
+  color: $muted;
+  text-align: center;
+}
+
 .pill {
   background: $field;
   border: 1px solid $line;
@@ -977,5 +982,151 @@
   .table th:nth-last-child(2) .filterPopover {
     left: auto;
     right: 0;
+  }
+
+  .tableWrap {
+    overflow: visible;
+  }
+
+  .table {
+    border-collapse: separate;
+    border-spacing: 0;
+    display: grid;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+
+  .table thead {
+    border-bottom: 1px solid $line;
+    display: block;
+    padding-bottom: 0.75rem;
+  }
+
+  .table thead tr {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table th {
+    border-bottom: 0;
+    display: block;
+    padding: 0;
+  }
+
+  .tableHeader {
+    display: grid;
+    gap: 0.3rem;
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .tableHeaderButton {
+    background: $field;
+    border: 1px solid $line;
+    border-radius: 0.55rem;
+    min-width: 0;
+    padding: 0.48rem 0.58rem;
+  }
+
+  .tableHeaderButton span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .filterButton {
+    background: white;
+    border-color: $line;
+    border-radius: 0.55rem;
+    height: auto;
+    min-height: 2.35rem;
+    width: 2.35rem;
+  }
+
+  .table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .table tbody tr {
+    background: white;
+    border: 1px solid $line;
+    border-radius: 0.8rem;
+    box-shadow: 0 8px 20px rgba(31, 41, 55, 0.05);
+    display: grid;
+    gap: 0.45rem 0.75rem;
+    grid-template-columns: minmax(0, 1fr) max-content;
+    padding: 0.85rem;
+  }
+
+  .table tbody tr:last-child td,
+  .table td {
+    border-bottom: 0;
+    padding: 0;
+  }
+
+  .table td {
+    min-width: 0;
+  }
+
+  .table td:nth-child(2) {
+    color: $ink;
+    font-weight: 850;
+    grid-column: 1;
+    order: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .table td:nth-child(6) {
+    font-size: 0.94rem;
+    font-weight: 900;
+    grid-column: 2;
+    order: 2;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .table td:nth-child(5) {
+    grid-column: 1;
+    order: 3;
+  }
+
+  .table td:nth-child(1) {
+    color: $muted;
+    font-size: 0.78rem;
+    font-weight: 750;
+    grid-column: 2;
+    order: 4;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .table td:nth-child(3) {
+    color: $muted;
+    font-size: 0.78rem;
+    font-weight: 750;
+    grid-column: 1 / -1;
+    order: 5;
+  }
+
+  .table td:nth-child(4) {
+    display: none;
+  }
+
+  .categoryChip {
+    max-width: 100%;
+  }
+
+  .categorySelect {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .emptyTableRow {
+    display: block !important;
+  }
+
+  .emptyTableRow td {
+    display: block;
+    text-align: center !important;
   }
 }

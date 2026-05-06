@@ -7,6 +7,7 @@ export type TransactionAmount = {
   currency: string
   amount: number
   pending?: boolean
+  excludeFromAnalytics?: boolean
 }
 
 export function summarizeBalances(rows: BalanceRow[]) {
@@ -35,7 +36,7 @@ export function summarizeCashFlow(rows: TransactionAmount[]) {
   const byCurrency = new Map<string, { currency: string; moneyIn: number; moneyOut: number; net: number }>()
 
   for (const row of rows) {
-    if (row.pending) {
+    if (row.pending || row.excludeFromAnalytics) {
       continue
     }
     const bucket = byCurrency.get(row.currency) ?? {
