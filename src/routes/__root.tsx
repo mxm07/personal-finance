@@ -18,7 +18,7 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import { requirePageAuthenticatedUser } from "../server-functions";
+import { requirePageAuthenticatedUser, syncIfStale } from "../server-functions";
 import "../styles/global.scss";
 import styles from "./__root.module.scss";
 
@@ -62,6 +62,30 @@ function RootComponent() {
       pathname === "/transactions" ? (currentSearch.search ?? "") : "",
     );
   }, [currentSearch.search, pathname]);
+
+  useEffect(() => {
+    if (!user || pathname === "/login") {
+      return;
+    }
+
+    let cancelled = false;
+    const poll = () => {
+      void syncIfStale()
+        .then((result) => {
+          if (!cancelled && result.status === "success") {
+            void router.invalidate();
+          }
+        })
+        .catch(() => undefined);
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 15 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [pathname, router, user]);
 
   if (pathname === "/login") {
     return (

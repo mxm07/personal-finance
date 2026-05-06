@@ -79,6 +79,11 @@ export const syncNow = createServerFn({ method: 'POST' }).handler(() => withAuth
   return runManualSync()
 }))
 
+export const syncIfStale = createServerFn({ method: 'POST' }).handler(() => withAuth(async () => {
+  const { runStaleSync } = await import('./server/actions')
+  return runStaleSync()
+}))
+
 export const importSimpleFinHistory = createServerFn({ method: 'POST' }).handler(() => withAuth(async () => {
   const { runHistoricalSync } = await import('./server/actions')
   return runHistoricalSync()

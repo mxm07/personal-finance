@@ -1,5 +1,4 @@
 import { readAccessUrl } from './secret'
-import { ensureStartupSync } from './sync'
 import { summarizeBalances, summarizeCashFlow } from './finance/calculations'
 import { getAnalyticsExcludedTransactionIds } from './finance/reporting'
 import { getStore, type AccountRecord, type TransactionRecord } from './storage/store'
@@ -10,7 +9,6 @@ const monthStart = () => {
 }
 
 export async function getDashboardData() {
-  await ensureStartupSync()
   const store = getStore()
   const accountRows = await store.listAccounts()
   const accountList = await getAccountList()
@@ -52,7 +50,6 @@ export async function getDashboardData() {
 }
 
 export async function getAccountsPageData() {
-  await ensureStartupSync()
   return {
     accounts: await getAccountList(),
     status: await getStatus(),
@@ -60,7 +57,6 @@ export async function getAccountsPageData() {
 }
 
 export async function getTransactionsPageData(input?: TransactionListInput) {
-  await ensureStartupSync()
   return {
     transactions: await getTransactionList(input),
     accounts: await getAccountList(),
@@ -70,7 +66,6 @@ export async function getTransactionsPageData(input?: TransactionListInput) {
 }
 
 export async function getCategoriesPageData() {
-  await ensureStartupSync()
   const store = getStore()
   const categories = await getCategories()
   const categoryById = new Map(categories.map((category) => [category.id, category]))

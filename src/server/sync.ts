@@ -10,8 +10,8 @@ const initialSyncLookbackSeconds = 60 * 60 * 24 * 90
 const historicalBackfillWindowSeconds = 60 * 60 * 24 * 45
 const maxBackfillChunks = Number(process.env.SIMPLEFIN_BACKFILL_CHUNKS ?? 48)
 const maxEmptyBackfillChunks = 4
+const staleSyncAfterSeconds = Number(process.env.SIMPLEFIN_POLL_INTERVAL_SECONDS ?? 15 * 60)
 let syncInFlight: Promise<SyncResult> | undefined
-let startupSyncStarted = false
 
 type HistoricalBackfillAccount = {
   accountId: string
@@ -47,18 +47,25 @@ export type SyncResult = {
   message: string
 }
 
-export async function ensureStartupSync() {
-  if (startupSyncStarted) {
-    return
+export async function syncSimpleFinIfStale(): Promise<SyncResult> {
+  if (syncInFlight) {
+    return { status: 'skipped', message: 'Sync already running.' }
   }
-  startupSyncStarted = true
 
-  if (await readAccessUrl()) {
-    await syncSimpleFin('startup').catch(() => undefined)
+  if (!await readAccessUrl()) {
+    return { status: 'skipped', message: 'SimpleFIN is not connected yet.' }
   }
+
+  const latest = await getStore().getLatestSyncRun()
+  const latestFinishedAt = latest?.finishedAt ?? latest?.startedAt ?? null
+  if (latestFinishedAt && unixNow() - latestFinishedAt < staleSyncAfterSeconds) {
+    return { status: 'skipped', message: 'Recent sync is still fresh.' }
+  }
+
+  return syncSimpleFin('poll')
 }
 
-export async function syncSimpleFin(trigger: 'manual' | 'startup' | 'claim'): Promise<SyncResult> {
+export async function syncSimpleFin(trigger: 'manual' | 'poll' | 'claim'): Promise<SyncResult> {
   if (syncInFlight) {
     return syncInFlight
   }

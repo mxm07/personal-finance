@@ -1,6 +1,6 @@
 import { claimAccessUrl } from './simplefin/client'
 import { clearAccessUrl, writeAccessUrl } from './secret'
-import { syncSimpleFin, syncSimpleFinHistory } from './sync'
+import { syncSimpleFin, syncSimpleFinHistory, syncSimpleFinIfStale } from './sync'
 import { normalizeMerchant } from './finance/categorization'
 import { getStore } from './storage/store'
 
@@ -14,6 +14,10 @@ export async function claimSimpleFin(input: { token: string }) {
 
 export async function runManualSync() {
   return syncSimpleFin('manual')
+}
+
+export async function runStaleSync() {
+  return syncSimpleFinIfStale()
 }
 
 export async function runHistoricalSync() {
