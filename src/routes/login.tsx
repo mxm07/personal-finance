@@ -23,15 +23,6 @@ function LoginPage() {
   return (
     <main className={styles.page}>
       <section className={styles.panel}>
-        <div className={styles.mark}>
-          <ShieldCheck size={24} />
-        </div>
-        <p className={styles.kicker}>Personal Finance</p>
-        <h1>Sign in</h1>
-        <p className={styles.copy}>
-          Access is restricted to your configured Google account.
-        </p>
-
         {search.error ? (
           <p className={styles.error}>{formatLoginError(search.error)}</p>
         ) : null}

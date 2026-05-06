@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { getDashboard, syncNow } from '../server-functions'
 import {
@@ -165,7 +165,7 @@ function OverviewPage() {
           </div>
           <div className={styles.budgetList}>
             {data.accounts.slice(0, 5).map((account) => (
-              <div className={styles.budgetRow} key={account.id}>
+              <div className={`${styles.budgetRow} ${styles.accountRow}`} key={account.id}>
                 <span className={styles.rowTitle}>{account.name}</span>
                 <span>{formatMoney(account.balance, account.currency)}</span>
                 <span className={styles.rowMeta}>{account.connectionName}</span>
@@ -255,8 +255,8 @@ function DonutChart({
   totalLabel: string
 }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
-  const radius = 58
-  const circumference = 2 * Math.PI * radius
+  const outerRadius = 72
+  const innerRadius = 44
   const total = rows.reduce((sum, row) => sum + row.amount, 0)
   let offset = 0
   const active = activeIndex == null ? null : rows[activeIndex]
@@ -265,27 +265,20 @@ function DonutChart({
   return (
     <div className={styles.donut}>
       <svg className={styles.donutSvg} viewBox="0 0 180 180" role="img" aria-label="Spending by category">
-        <circle cx="90" cy="90" r={radius} fill="none" stroke="#eef2f8" strokeWidth="28" />
+        <circle cx="90" cy="90" r={(outerRadius + innerRadius) / 2} fill="none" stroke="#eef2f8" strokeWidth={outerRadius - innerRadius} />
         {rows.map((row, index) => {
-          const length = total ? (row.amount / total) * circumference : 0
-          const dashOffset = -offset
-          offset += length
+          const startAngle = total ? (offset / total) * 360 - 90 : -90
+          offset += row.amount
+          const endAngle = total ? (offset / total) * 360 - 90 : -90
 
           return (
-            <circle
-              key={row.name}
-              cx="90"
-              cy="90"
-              r={radius}
-              fill="none"
-              stroke={row.color}
-              strokeDasharray={`${length} ${circumference - length}`}
-              strokeDashoffset={dashOffset}
-              strokeWidth="28"
+            <path
+              key={`${row.categoryId ?? 'uncategorized'}-${row.name}-${index}`}
+              d={getDonutSegmentPath(90, 90, outerRadius, innerRadius, startAngle, endAngle)}
+              fill={row.color}
               role="button"
               aria-label={`View ${row.name} transactions`}
               tabIndex={0}
-              transform="rotate(-90 90 90)"
               className={styles.donutSector}
               onClick={() => onRowClick?.(row)}
               onKeyDown={(event) => {
@@ -303,7 +296,7 @@ function DonutChart({
         })}
       </svg>
       <div className={styles.donutCenter}>
-        <strong>{totalLabel}</strong>
+        <strong className={getDonutValueClass(totalLabel)}>{totalLabel}</strong>
         <span>Total</span>
       </div>
       {active && activePosition ? (
@@ -483,22 +476,41 @@ function LineChart({
 }: {
   points: Array<{ date: string; moneyIn: number; moneyOut: number; net: number; currency?: string }>
 }) {
+  const svgRef = useRef<SVGSVGElement | null>(null)
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
+  const [chartWidth, setChartWidth] = useState(640)
   const income = points.map((point) => point.moneyIn)
   const expenses = points.map((point) => point.moneyOut)
   const hasActivity = points.some((point) => point.moneyIn || point.moneyOut)
   const maxValue = Math.max(...income, ...expenses, 1)
   const chartPoints = points.map((point, index) => ({
     ...point,
-    incomePoint: getPoint(point.moneyIn, index, points.length, 640, 220, maxValue),
-    expensePoint: getPoint(point.moneyOut, index, points.length, 640, 220, maxValue),
+    incomePoint: getPoint(point.moneyIn, index, points.length, chartWidth, 220, maxValue),
+    expensePoint: getPoint(point.moneyOut, index, points.length, chartWidth, 220, maxValue),
   }))
   const active = activeIndex == null ? null : chartPoints[activeIndex]
 
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) {
+      return
+    }
+
+    const updateWidth = () => {
+      setChartWidth(Math.max(320, Math.round(svg.getBoundingClientRect().width)))
+    }
+    updateWidth()
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(svg)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <svg
+      ref={svgRef}
       className={styles.lineChart}
-      viewBox="0 0 640 220"
+      viewBox={`0 0 ${chartWidth} 220`}
       role="img"
       aria-label="Income and expense trend"
       onMouseLeave={() => setActiveIndex(null)}
@@ -512,7 +524,7 @@ function LineChart({
         point.x = event.clientX
         point.y = event.clientY
         const cursor = point.matrixTransform(matrix.inverse())
-        setActiveIndex(getNearestPointIndex(cursor.x, points.length, 640))
+        setActiveIndex(getNearestPointIndex(cursor.x, points.length, chartWidth))
       }}
     >
       <defs>
@@ -526,31 +538,31 @@ function LineChart({
         </linearGradient>
       </defs>
       {[40, 85, 130, 175].map((y) => (
-        <line key={y} x1="0" x2="640" y1={y} y2={y} stroke="#e5e9f2" strokeDasharray="4 6" />
+        <line key={y} x1="0" x2={chartWidth} y1={y} y2={y} stroke="#e5e9f2" strokeDasharray="4 6" />
       ))}
       {hasActivity ? (
         <>
-          <path d={areaPath(income, 640, 220, maxValue)} fill="url(#incomeFill)" />
-          <path d={areaPath(expenses, 640, 220, maxValue)} fill="url(#expenseFill)" />
-          <path d={linePath(income, 640, 220, maxValue)} fill="none" stroke="#1aa37a" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
-          <path d={linePath(expenses, 640, 220, maxValue)} fill="none" stroke="#6f57ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          <path d={areaPath(income, chartWidth, 220, maxValue)} fill="url(#incomeFill)" />
+          <path d={areaPath(expenses, chartWidth, 220, maxValue)} fill="url(#expenseFill)" />
+          <path d={linePath(income, chartWidth, 220, maxValue)} fill="none" stroke="#1aa37a" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          <path d={linePath(expenses, chartWidth, 220, maxValue)} fill="none" stroke="#6f57ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
           {active ? (
             <g>
               <line x1={active.incomePoint.x} x2={active.incomePoint.x} y1="18" y2="208" stroke="#cbd5e1" strokeDasharray="4 5" />
               <circle cx={active.incomePoint.x} cy={active.incomePoint.y} r="6" fill="#1aa37a" stroke="white" strokeWidth="3" />
               <circle cx={active.expensePoint.x} cy={active.expensePoint.y} r="6" fill="#6f57ff" stroke="white" strokeWidth="3" />
-              <ChartTooltip point={active} />
+              <ChartTooltip point={active} width={chartWidth} />
             </g>
           ) : null}
         </>
       ) : (
-        <text x="320" y="116" fill="#657086" fontSize="16" textAnchor="middle">No posted activity this month</text>
+        <text x={chartWidth / 2} y="116" fill="#657086" fontSize="16" textAnchor="middle">No posted activity this month</text>
       )}
     </svg>
   )
 }
 
-function ChartTooltip({ point }: {
+function ChartTooltip({ point, width }: {
   point: {
     date: string
     moneyIn: number
@@ -559,14 +571,15 @@ function ChartTooltip({ point }: {
     currency?: string
     incomePoint: { x: number; y: number }
   }
+  width: number
 }) {
-  const width = 168
-  const x = Math.min(Math.max(point.incomePoint.x - width / 2, 8), 640 - width - 8)
+  const tooltipWidth = 168
+  const x = Math.min(Math.max(point.incomePoint.x - tooltipWidth / 2, 8), width - tooltipWidth - 8)
   const y = point.incomePoint.y > 92 ? point.incomePoint.y - 86 : point.incomePoint.y + 18
 
   return (
     <g transform={`translate(${x} ${y})`}>
-      <rect width={width} height="72" rx="10" fill="#151927" opacity="0.96" />
+      <rect width={tooltipWidth} height="72" rx="10" fill="#151927" opacity="0.96" />
       <text x="12" y="18" fill="white" fontSize="12" fontWeight="700">{formatChartBucketLabel(point.date)}</text>
       <text x="12" y="38" fill="#9ee6c8" fontSize="11">Income: {formatMoney(point.moneyIn, point.currency ?? 'USD')}</text>
       <text x="12" y="54" fill="#c8beff" fontSize="11">Expenses: {formatMoney(point.moneyOut, point.currency ?? 'USD')}</text>
@@ -638,6 +651,64 @@ function getDonutTooltipPosition(rows: Array<{ amount: number }>, index: number)
     x: 50 + Math.cos(angle) * radius,
     y: 50 + Math.sin(angle) * radius,
   }
+}
+
+function getDonutValueClass(value: string) {
+  if (value.length >= 12) {
+    return `${styles.donutValue} ${styles.donutValueDense}`
+  }
+  if (value.length >= 10) {
+    return `${styles.donutValue} ${styles.donutValueCompact}`
+  }
+  return styles.donutValue
+}
+
+function getDonutSegmentPath(
+  centerX: number,
+  centerY: number,
+  outerRadius: number,
+  innerRadius: number,
+  startAngle: number,
+  endAngle: number,
+) {
+  const angle = endAngle - startAngle
+  if (angle >= 359.99) {
+    return [
+      `M ${centerX} ${centerY - outerRadius}`,
+      `A ${outerRadius} ${outerRadius} 0 1 1 ${centerX - 0.01} ${centerY - outerRadius}`,
+      `A ${outerRadius} ${outerRadius} 0 1 1 ${centerX} ${centerY - outerRadius}`,
+      `M ${centerX} ${centerY - innerRadius}`,
+      `A ${innerRadius} ${innerRadius} 0 1 0 ${centerX - 0.01} ${centerY - innerRadius}`,
+      `A ${innerRadius} ${innerRadius} 0 1 0 ${centerX} ${centerY - innerRadius}`,
+      'Z',
+    ].join(' ')
+  }
+
+  const outerStart = getPointOnCircle(centerX, centerY, outerRadius, startAngle)
+  const outerEnd = getPointOnCircle(centerX, centerY, outerRadius, endAngle)
+  const innerStart = getPointOnCircle(centerX, centerY, innerRadius, startAngle)
+  const innerEnd = getPointOnCircle(centerX, centerY, innerRadius, endAngle)
+  const largeArcFlag = angle > 180 ? 1 : 0
+
+  return [
+    `M ${outerStart.x} ${outerStart.y}`,
+    `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${outerEnd.x} ${outerEnd.y}`,
+    `L ${innerEnd.x} ${innerEnd.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${innerStart.x} ${innerStart.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function getPointOnCircle(centerX: number, centerY: number, radius: number, angle: number) {
+  const radians = angle * Math.PI / 180
+  return {
+    x: roundSvgPoint(centerX + radius * Math.cos(radians)),
+    y: roundSvgPoint(centerY + radius * Math.sin(radians)),
+  }
+}
+
+function roundSvgPoint(value: number) {
+  return Math.round(value * 1000) / 1000
 }
 
 function differenceInDays(start: Date, end: Date) {

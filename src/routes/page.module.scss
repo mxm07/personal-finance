@@ -509,7 +509,8 @@
 }
 
 .lineChart {
-  height: 12rem;
+  display: block;
+  height: 13.75rem;
   min-width: 0;
   width: 100%;
 }
@@ -540,14 +541,15 @@
 
 .donutSector {
   cursor: pointer;
+  fill-rule: evenodd;
   outline: none;
-  transition: opacity 150ms ease, stroke-width 150ms ease;
+  transition: filter 150ms ease, opacity 150ms ease;
 }
 
 .donutSector:hover,
 .donutSector:focus {
-  opacity: 0.88;
-  stroke-width: 32;
+  filter: drop-shadow(0 7px 12px rgba(31, 41, 55, 0.16));
+  opacity: 0.94;
 }
 
 .donutCenter {
@@ -568,6 +570,23 @@
 .donutCenter strong {
   display: block;
   font-size: 1.3rem;
+}
+
+.donutValue {
+  line-height: 1;
+  max-width: 5.15rem;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.donutCenter .donutValueCompact {
+  font-size: 1rem;
+}
+
+.donutCenter .donutValueDense {
+  font-size: 0.84rem;
 }
 
 .donutCenter span {
@@ -641,6 +660,16 @@
   grid-template-columns: minmax(0, 1fr) max-content;
 }
 
+.accountRow {
+  column-gap: 0.75rem;
+  row-gap: 0.16rem;
+}
+
+.accountRow .rowMeta {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
 .clickableRow {
   @include button-reset;
   border-radius: 0.6rem;
@@ -702,6 +731,7 @@
 
 .rowTitle {
   color: $ink;
+  display: block;
   font-weight: 850;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -709,10 +739,61 @@
 
 .rowMeta {
   color: $muted;
+  display: block;
   font-size: 0.78rem;
   margin-top: 0.15rem;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.filePicker {
+  align-items: center;
+  background: white;
+  border: 1px solid $line;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+  min-height: 2.75rem;
+  padding: 0.42rem;
+}
+
+.filePicker:focus-within {
+  border-color: rgba($accent, 0.42);
+  box-shadow: 0 0 0 3px rgba($accent, 0.1);
+}
+
+.fileInput {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.fileButton {
+  align-items: center;
+  background: $accent-strong;
+  border-radius: 0.5rem;
+  color: white;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  white-space: nowrap;
+}
+
+.fileName {
+  color: $muted;
+  font-size: 0.85rem;
+  font-weight: 750;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .miniChart {
@@ -876,6 +957,10 @@
   .transactionRow,
   .billRow {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filePicker {
+    grid-template-columns: 1fr;
   }
 
   .transactionRow .merchantIcon,

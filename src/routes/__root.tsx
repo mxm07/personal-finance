@@ -2,14 +2,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { ReactNode } from "react";
 import {
-  Bell,
-  CircleHelp,
   CreditCard,
   Gauge,
   LayoutDashboard,
   Search,
   Settings,
-  Sparkles,
   Tags,
 } from "lucide-react";
 import {
@@ -47,9 +44,7 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Personal Finance" },
     ],
-    links: [
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-    ],
+    links: [{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" }],
   }),
   component: RootComponent,
 });
@@ -96,8 +91,8 @@ function RootComponent() {
       <div className={styles.shell}>
         <aside className={styles.sidebar}>
           <div className={styles.brand}>
-            <span className={styles.logoMark}>F</span>
-            <span className={styles.title}>Personal Finance</span>
+            <span className={styles.logoMark}>M</span>
+            <span className={styles.title}>Melo Finances</span>
           </div>
           <nav className={styles.nav} aria-label="Primary navigation">
             <Link
@@ -173,20 +168,6 @@ function RootComponent() {
                 onChange={(event) => setGlobalSearch(event.target.value)}
               />
             </form>
-            <button
-              className={styles.iconButton}
-              type="button"
-              aria-label="Notifications"
-            >
-              <Bell size={18} />
-            </button>
-            <button
-              className={styles.iconButton}
-              type="button"
-              aria-label="Help"
-            >
-              <CircleHelp size={18} />
-            </button>
             <div className={styles.profile}>
               {user?.picture ? (
                 <img

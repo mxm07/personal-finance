@@ -83,8 +83,7 @@
 
 .navIcon svg,
 .sidebarCardIcon svg,
-.search svg,
-.iconButton svg {
+.search svg {
   display: block;
   stroke-width: 2.3;
 }
@@ -125,7 +124,7 @@
   align-items: center;
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: minmax(18rem, 28rem) auto auto max-content;
+  grid-template-columns: minmax(18rem, 28rem) max-content;
   justify-content: end;
   margin-bottom: 1.6rem;
 }
@@ -165,32 +164,6 @@
   min-width: 0;
   outline: 0;
   width: 100%;
-}
-
-.iconButton {
-  @include button-reset;
-  align-items: center;
-  background: transparent;
-  border-radius: 999px;
-  color: $muted;
-  display: inline-flex;
-  font-weight: 850;
-  height: 2.4rem;
-  justify-content: center;
-  position: relative;
-  width: 2.4rem;
-}
-
-.iconButton:first-of-type::after {
-  background: $red;
-  border: 2px solid $app-bg;
-  border-radius: 999px;
-  content: "";
-  height: 0.55rem;
-  position: absolute;
-  right: 0.45rem;
-  top: 0.45rem;
-  width: 0.55rem;
 }
 
 .profile {
@@ -284,7 +257,7 @@
   }
 
   .topbar {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr);
     justify-content: stretch;
   }
 
@@ -310,7 +283,7 @@
   }
 
   .topbar {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr;
     gap: 0.45rem;
     margin-bottom: 1rem;
   }
@@ -322,11 +295,6 @@
   .search {
     min-height: 2.4rem;
     padding: 0 0.65rem;
-  }
-
-  .iconButton {
-    height: 2.25rem;
-    width: 2.25rem;
   }
 }
 
@@ -343,13 +311,5 @@
   .navLink {
     font-size: 0;
     gap: 0;
-  }
-
-  .topbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .iconButton[aria-label="Help"] {
-    display: none;
   }
 }

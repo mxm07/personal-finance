@@ -1,6 +1,7 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { redirect } from '@tanstack/react-router'
 import { getRequestUrl, setResponseStatus, useSession } from '@tanstack/react-start/server'
+import { OAuth2Client } from 'google-auth-library'
 
 type AuthSessionData = {
   user?: {
@@ -8,26 +9,8 @@ type AuthSessionData = {
     name?: string
     picture?: string
   }
-  oauthStateHash?: string
+  oauthState?: string
   redirectTo?: string
-}
-
-type GoogleTokenResponse = {
-  access_token?: string
-  expires_in?: number
-  id_token?: string
-  scope?: string
-  token_type?: string
-  error?: string
-  error_description?: string
-}
-
-type GoogleTokenInfo = {
-  aud?: string
-  email?: string
-  email_verified?: string | boolean
-  name?: string
-  picture?: string
 }
 
 const sessionName = 'pf_session'
@@ -71,17 +54,13 @@ export async function startGoogleSignIn() {
   const redirectTo = sanitizeRedirectPath(requestUrl.searchParams.get('redirect'))
   const state = randomBytes(stateBytes).toString('base64url')
   const session = await getAuthSession()
-  await session.update({ oauthStateHash: hashState(state), redirectTo })
+  await session.update({ oauthState: state, redirectTo })
 
-  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-  url.searchParams.set('client_id', config.clientId)
-  url.searchParams.set('redirect_uri', config.redirectUri)
-  url.searchParams.set('response_type', 'code')
-  url.searchParams.set('scope', 'openid email profile')
-  url.searchParams.set('state', state)
-  url.searchParams.set('prompt', 'select_account')
-
-  return redirectResponse(url.toString())
+  return redirectResponse(createGoogleOAuthClient(config).generateAuthUrl({
+    prompt: 'select_account',
+    scope: ['openid', 'email', 'profile'],
+    state,
+  }))
 }
 
 export async function completeGoogleSignIn(request: Request) {
@@ -98,8 +77,8 @@ export async function completeGoogleSignIn(request: Request) {
   }
 
   const session = await getAuthSession()
-  if (!session.data.oauthStateHash || !safeEqual(session.data.oauthStateHash, hashState(state))) {
-    await session.update({ oauthStateHash: undefined })
+  if (!session.data.oauthState || session.data.oauthState !== state) {
+    await session.update({ oauthState: undefined })
     return redirectResponse('/login?error=invalid_oauth_state')
   }
 
@@ -113,17 +92,17 @@ export async function completeGoogleSignIn(request: Request) {
     return redirectResponse('/login?error=invalid_id_token')
   }
   const email = profile.email?.toLocaleLowerCase()
-  if (!email || !isEmailVerified(profile.email_verified)) {
+  if (!email || !profile.email_verified) {
     return redirectResponse('/login?error=email_not_verified')
   }
   if (!config.allowedEmails.includes(email)) {
-    await session.update({ oauthStateHash: undefined, user: undefined })
+    await session.update({ oauthState: undefined, user: undefined })
     return redirectResponse('/login?error=unauthorized_email')
   }
 
   const redirectTo = session.data.redirectTo ?? '/'
   await session.update({
-    oauthStateHash: undefined,
+    oauthState: undefined,
     redirectTo: undefined,
     user: {
       email,
@@ -290,53 +269,28 @@ function normalizeBaseUrl(value: string) {
   return url.toString()
 }
 
+function createGoogleOAuthClient(config: ReturnType<typeof getGoogleAuthConfig>) {
+  return new OAuth2Client(config.clientId, config.clientSecret, config.redirectUri)
+}
+
 async function exchangeCodeForToken(code: string, config: ReturnType<typeof getGoogleAuthConfig>) {
-  const body = new URLSearchParams({
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
+  const { tokens } = await createGoogleOAuthClient(config).getToken({
     code,
-    grant_type: 'authorization_code',
     redirect_uri: config.redirectUri,
   })
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
-  const payload = await response.json() as GoogleTokenResponse
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error_description ?? payload.error ?? 'Google token exchange failed.')
-  }
-  return payload
+  return tokens
 }
 
 async function verifyGoogleIdToken(idToken: string, clientId: string) {
-  const url = new URL('https://oauth2.googleapis.com/tokeninfo')
-  url.searchParams.set('id_token', idToken)
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error('Google ID token verification failed.')
-  }
-
-  const payload = await response.json() as GoogleTokenInfo
-  if (payload.aud !== clientId) {
-    throw new Error('Google ID token audience did not match this app.')
+  const ticket = await new OAuth2Client(clientId).verifyIdToken({
+    idToken,
+    audience: clientId,
+  })
+  const payload = ticket.getPayload()
+  if (!payload) {
+    throw new Error('Google ID token did not include a payload.')
   }
   return payload
-}
-
-function isEmailVerified(value: GoogleTokenInfo['email_verified']) {
-  return value === true || value === 'true'
-}
-
-function hashState(state: string) {
-  return createHash('sha256').update(state).digest('base64url')
-}
-
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left)
-  const rightBuffer = Buffer.from(right)
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer)
 }
 
 function sanitizeRedirectPath(value: string | null) {
@@ -350,29 +304,10 @@ function sanitizeRedirectPath(value: string | null) {
 }
 
 function redirectResponse(location: string) {
-  return new Response(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="refresh" content="0;url=${escapeHtmlAttribute(location)}">
-    <title>Redirecting</title>
-    <script>location.replace(${JSON.stringify(location)})</script>
-  </head>
-  <body>
-    <a href="${escapeHtmlAttribute(location)}">Continue</a>
-  </body>
-</html>`, {
-    status: 200,
+  return new Response(null, {
+    status: 302,
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
+      Location: location,
     },
   })
-}
-
-function escapeHtmlAttribute(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
 }

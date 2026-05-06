@@ -27,7 +27,10 @@ $radius-sm: 0.55rem;
 }
 
 @mixin button-reset {
+  appearance: none;
+  background: transparent;
   border: 0;
   cursor: pointer;
   font: inherit;
+  padding: 0;
 }

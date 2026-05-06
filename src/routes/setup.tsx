@@ -23,7 +23,11 @@ function SetupPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [csvFiles, setCsvFiles] = useState<FileList | null>(null)
   const [csvAccountId, setCsvAccountId] = useState('')
+  const [csvInputKey, setCsvInputKey] = useState(0)
   const [importingCsv, setImportingCsv] = useState(false)
+  const csvFileLabel = csvFiles?.length
+    ? [...csvFiles].map((file) => file.name).join(', ')
+    : 'No CSV selected'
 
   return (
     <section className={styles.page}>
@@ -121,6 +125,7 @@ function SetupPage() {
               .then((messages) => {
                 setMessage(messages.join(' '))
                 setCsvFiles(null)
+                setCsvInputKey((key) => key + 1)
                 return router.invalidate()
               })
               .catch((error: unknown) => {
@@ -131,14 +136,18 @@ function SetupPage() {
               })
           }}
         >
-          <input
-            key={csvFiles ? [...csvFiles].map((file) => file.name).join('|') : 'empty'}
-            accept=".csv,text/csv"
-            className={styles.field}
-            multiple
-            type="file"
-            onChange={(event) => setCsvFiles(event.target.files)}
-          />
+          <label className={styles.filePicker}>
+            <input
+              key={csvInputKey}
+              accept=".csv,text/csv"
+              className={styles.fileInput}
+              multiple
+              type="file"
+              onChange={(event) => setCsvFiles(event.target.files)}
+            />
+            <span className={styles.fileButton}>Choose CSV</span>
+            <span className={styles.fileName}>{csvFileLabel}</span>
+          </label>
           <select className={styles.field} value={csvAccountId} onChange={(event) => setCsvAccountId(event.target.value)}>
             <option value="">Auto-detect account</option>
             {data.accounts.map((account) => (
