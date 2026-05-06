@@ -32,6 +32,8 @@ const categoryGroups: CategoryGroup[] = [
       /\b(online|mobile|automatic|auto)\s+payment\b/,
       /\b(payment\s+thank\s+you|thank\s+you\s+payment)\b/,
       /\b(credit\s+card|cc)\s+payment\b/,
+      /\b(crcardpmt|ccardpmt|cardpmt|card\s*pmt)\b/,
+      /\b(card|credit\s+card|cc)\s+(payment|pmt)\b/,
       /\b(payment\s+to|payment\s+from)\b/,
       /\b(transfer|xfer|external\s+transfer|internal\s+transfer)\b/,
       /\b(zelle|venmo|cash\s*app|paypal\s+transfer)\b/,
@@ -277,6 +279,18 @@ function categorizeByDirection(
       categorySource: 'smart',
       categoryConfidence: 0.62,
       categoryReason: 'positive transaction treated as income',
+      normalizedMerchant,
+    } : null
+  }
+
+  if (/\bach\s+(withdrawal|debit|payment)\b/.test(normalized)) {
+    const category = categoryByName.get('transfers')
+    return category ? {
+      categoryId: category.id,
+      categoryName: category.name,
+      categorySource: 'smart',
+      categoryConfidence: 0.68,
+      categoryReason: 'ACH outflow without stronger local merchant signal',
       normalizedMerchant,
     } : null
   }

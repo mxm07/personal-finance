@@ -107,6 +107,32 @@ function TransactionsPage() {
     })
     setOpenFilter(null)
   }
+  const paginationControls = (
+    <div className={styles.tableControls}>
+      <span className={styles.paginationSummary}>
+        Showing {total ? ((page - 1) * pageSize) + 1 : 0}-{Math.min(page * pageSize, total)} of {total}
+      </span>
+      <label className={styles.pageSizeControl}>
+        <span>Rows</span>
+        <select
+          className={styles.field}
+          value={pageSize}
+          onChange={(event) => navigateWith({ pageSize: Number(event.target.value), page: 1 })}
+        >
+          {[10, 25, 50, 100].map((size) => (
+            <option key={size} value={size}>{size} per page</option>
+          ))}
+        </select>
+      </label>
+      <div className={styles.paginationButtons}>
+        <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: 1 })}>First</button>
+        <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: page - 1 })}>Prev</button>
+        <span className={styles.pageStatus}>Page {page} of {pageCount}</span>
+        <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: page + 1 })}>Next</button>
+        <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: pageCount })}>Last</button>
+      </div>
+    </div>
+  )
 
   return (
     <section className={styles.page}>
@@ -119,6 +145,8 @@ function TransactionsPage() {
           Sync now
         </button>
       </header>
+
+      {paginationControls}
 
       <div className={styles.tableWrap}>
         <table className={styles.table}>
@@ -326,28 +354,6 @@ function TransactionsPage() {
             ) : null}
           </tbody>
         </table>
-      </div>
-
-      <div className={styles.pagination}>
-        <span className={styles.subtle}>
-          Showing {total ? ((page - 1) * pageSize) + 1 : 0}-{Math.min(page * pageSize, total)} of {total}
-        </span>
-        <select
-          className={styles.field}
-          value={pageSize}
-          onChange={(event) => navigateWith({ pageSize: Number(event.target.value), page: 1 })}
-        >
-          {[10, 25, 50, 100].map((size) => (
-            <option key={size} value={size}>{size} per page</option>
-          ))}
-        </select>
-        <div className={styles.toolbar}>
-          <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: 1 })}>First</button>
-          <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: page - 1 })}>Prev</button>
-          <span className={styles.subtle}>Page {page} of {pageCount}</span>
-          <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: page + 1 })}>Next</button>
-          <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: pageCount })}>Last</button>
-        </div>
       </div>
     </section>
   )

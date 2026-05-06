@@ -56,6 +56,35 @@ describe('local transaction categorization', () => {
     expect(result.categoryConfidence).toBeGreaterThan(0.9)
   })
 
+  it('detects compact ACH credit card payment descriptions as transfers', () => {
+    const result = categorizeTransaction({
+      description: 'ACH Withdrawal CAPITAL ONE CRCARDPMT',
+      amount: -4391.98,
+    }, categories, [])
+
+    expect(result.categoryName).toBe('Transfers')
+    expect(result.categoryConfidence).toBeGreaterThan(0.9)
+  })
+
+  it('lets stronger ACH merchant matches win before the ACH transfer fallback', () => {
+    const result = categorizeTransaction({
+      description: 'ACH Withdrawal PUBLIC SERVICE PSEG',
+      amount: -277.23,
+    }, categories, [])
+
+    expect(result.categoryName).toBe('Utilities')
+  })
+
+  it('uses transfers instead of shopping for unknown ACH outflows', () => {
+    const result = categorizeTransaction({
+      description: 'ACH Withdrawal EXTERNAL PAYMENT',
+      amount: -75,
+    }, categories, [])
+
+    expect(result.categoryName).toBe('Transfers')
+    expect(result.categoryConfidence).toBeLessThan(0.8)
+  })
+
   it('treats positive payroll-like transactions as income', () => {
     const result = categorizeTransaction({
       description: 'ACME INC DIRECT DEPOSIT PAYROLL',

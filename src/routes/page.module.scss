@@ -177,11 +177,11 @@
     linear-gradient(45deg, transparent 50%, $muted 50%),
     linear-gradient(135deg, $muted 50%, transparent 50%);
   background-position:
-    calc(100% - 1.05rem) 50%,
-    calc(100% - 0.72rem) 50%;
+    calc(100% - 1.25rem) 50%,
+    calc(100% - 0.92rem) 50%;
   background-repeat: no-repeat;
   background-size: 0.34rem 0.34rem, 0.34rem 0.34rem;
-  padding-right: 2.45rem;
+  padding-right: 2.9rem;
 }
 
 .tableWrap {
@@ -405,13 +405,48 @@
   margin-top: 0.85rem;
 }
 
-.pagination {
+.tableControls {
+  @include card;
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+}
+
+.paginationSummary,
+.pageStatus,
+.pageSizeControl span {
+  color: $muted;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pageSizeControl {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.55rem;
+  justify-self: end;
+  min-width: 0;
+}
+
+.pageSizeControl .field {
+  min-width: 9rem;
+}
+
+.paginationButtons {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: space-between;
+  gap: 0.45rem;
+  justify-content: flex-end;
   min-width: 0;
+}
+
+.pageStatus {
+  padding: 0 0.3rem;
+  white-space: nowrap;
 }
 
 .error {
@@ -751,19 +786,32 @@
     font-size: 1.45rem;
   }
 
-  .pagination {
+  .tableControls {
     align-items: stretch;
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .pagination > .field {
+  .pageSizeControl {
+    justify-content: space-between;
+    justify-self: stretch;
     width: 100%;
   }
 
-  .pagination .toolbar {
+  .pageSizeControl .field {
+    min-width: 0;
+    width: min(12rem, 70%);
+  }
+
+  .paginationButtons {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pageStatus {
+    grid-column: 1 / -1;
+    order: -1;
+    text-align: center;
   }
 }
 
