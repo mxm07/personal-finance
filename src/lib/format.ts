@@ -19,6 +19,7 @@ export function formatDate(epochSeconds: number | null | undefined) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'America/New_York',
   }).format(new Date(epochSeconds * 1000))
 }
 
@@ -32,5 +33,6 @@ export function formatDateTime(epochSeconds: number | null | undefined) {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'America/New_York',
   }).format(new Date(epochSeconds * 1000))
 }
