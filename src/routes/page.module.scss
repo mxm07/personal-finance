@@ -454,6 +454,10 @@
   white-space: nowrap;
 }
 
+.mobileLoadMore {
+  display: none;
+}
+
 .error {
   background: rgba($red, 0.08);
   border: 1px solid rgba($red, 0.28);
@@ -902,6 +906,10 @@
 }
 
 @media (max-width: 980px) {
+  .tableControls {
+    display: none;
+  }
+
   .tableWrap {
     overflow: visible;
   }
@@ -1057,6 +1065,16 @@
   .emptyTableRow td {
     display: block;
     text-align: center !important;
+  }
+
+  .mobileLoadMore {
+    color: $muted;
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 750;
+    min-height: 2.25rem;
+    padding: 0.35rem 0 0.8rem;
+    text-align: center;
   }
 }
 

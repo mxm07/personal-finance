@@ -82,10 +82,19 @@ function TransactionsPage() {
   const [maxAmount, setMaxAmount] = useState(params.maxAmount == null ? '' : String(params.maxAmount))
   const [openFilter, setOpenFilter] = useState<string | null>(null)
   const [editingCategoryFor, setEditingCategoryFor] = useState<string | null>(null)
+  const [mobileRows, setMobileRows] = useState(data.transactions.rows)
+  const [mobilePage, setMobilePage] = useState(data.transactions.page)
+  const [mobilePageCount, setMobilePageCount] = useState(data.transactions.pageCount)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const useMobileList = useMediaQuery('(max-width: 980px)')
   const page = data.transactions.page
   const pageSize = data.transactions.pageSize
   const pageCount = data.transactions.pageCount
   const total = data.transactions.total
+  const visibleRows = useMobileList ? mobileRows : data.transactions.rows
+  const mobileHasMore = mobilePage < mobilePageCount
 
   const navigateWith = (next: Partial<typeof params>) => {
     void router.navigate({
@@ -107,6 +116,47 @@ function TransactionsPage() {
     })
     setOpenFilter(null)
   }
+
+  useEffect(() => {
+    setMobileRows(data.transactions.rows)
+    setMobilePage(data.transactions.page)
+    setMobilePageCount(data.transactions.pageCount)
+    setLoadingMore(false)
+    setLoadMoreError(null)
+  }, [data.transactions.page, data.transactions.pageCount, data.transactions.rows])
+
+  useEffect(() => {
+    const node = loadMoreRef.current
+    if (!node || !useMobileList || !mobileHasMore || loadingMore || loadMoreError) {
+      return
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        return
+      }
+
+      setLoadingMore(true)
+      setLoadMoreError(null)
+      void getTransactionsData({
+        data: getTransactionQuery(params, mobilePage + 1),
+      }).then((result) => {
+        setMobileRows((rows) => appendUniqueTransactions(rows, result.transactions.rows))
+        setMobilePage(result.transactions.page)
+        setMobilePageCount(result.transactions.pageCount)
+      }).catch((error: unknown) => {
+        setLoadMoreError(error instanceof Error ? error.message : 'Could not load more transactions.')
+      }).finally(() => {
+        setLoadingMore(false)
+      })
+    }, {
+      rootMargin: '260px 0px',
+    })
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [loadMoreError, loadingMore, mobileHasMore, mobilePage, params, useMobileList])
+
   const paginationControls = (
     <div className={styles.tableControls}>
       <span className={styles.paginationSummary}>
@@ -301,7 +351,7 @@ function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {data.transactions.rows.map((transaction) => (
+            {visibleRows.map((transaction) => (
               <tr key={transaction.id}>
                 <td data-label="Date">{formatDate(transaction.postedAt)}</td>
                 <td data-label="Description">
@@ -349,14 +399,65 @@ function TransactionsPage() {
                 </td>
               </tr>
             ))}
-            {!data.transactions.rows.length ? (
+            {!visibleRows.length ? (
               <tr className={styles.emptyTableRow}><td colSpan={6}>No matching transactions.</td></tr>
             ) : null}
           </tbody>
         </table>
       </div>
+      <div className={styles.mobileLoadMore} ref={loadMoreRef} aria-live="polite">
+        {loadMoreError ? loadMoreError : loadingMore ? 'Loading more transactions...' : mobileHasMore ? 'Scroll for more transactions' : visibleRows.length ? 'All matching transactions loaded' : ''}
+      </div>
     </section>
   )
+}
+
+function getTransactionQuery(params: ReturnType<typeof Route.useSearch>, page: number) {
+  return {
+    search: params.search,
+    accountId: params.accountId,
+    connectionId: params.connectionId,
+    categoryId: params.categoryId === 'uncategorized'
+      ? null
+      : params.categoryId ? Number(params.categoryId) : undefined,
+    pending: params.pending,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    minAmount: params.minAmount,
+    maxAmount: params.maxAmount,
+    page,
+    pageSize: params.pageSize,
+    sortBy: params.sortBy,
+    sortDir: params.sortDir,
+  }
+}
+
+function appendUniqueTransactions<TRow extends { id: string }>(rows: TRow[], nextRows: TRow[]) {
+  const seen = new Set(rows.map((row) => row.id))
+  return [
+    ...rows,
+    ...nextRows.filter((row) => {
+      if (seen.has(row.id)) {
+        return false
+      }
+      seen.add(row.id)
+      return true
+    }),
+  ]
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const update = () => setMatches(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [query])
+
+  return matches
 }
 
 function getInstitutions(accounts: Array<{ connectionId: string; connectionName: string | null }>) {
