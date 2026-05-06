@@ -29,6 +29,10 @@ import { getTransactionsData, setTransactionCategory, syncNow } from '../server-
 import { formatDate, formatMoney } from '../lib/format'
 import styles from './page.module.scss'
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+const TRANSACTIONS_INFINITE_SCROLL_STORAGE_KEY = 'personalFinance.transactions.infiniteScroll'
+const TRANSACTIONS_PAGE_SIZE_STORAGE_KEY = 'personalFinance.transactions.pageSize'
+
 export const Route = createFileRoute('/transactions')({
   validateSearch: z.object({
     search: z.string().optional(),
@@ -83,20 +87,23 @@ function TransactionsPage() {
   const [maxAmount, setMaxAmount] = useState(params.maxAmount == null ? '' : String(params.maxAmount))
   const [openFilter, setOpenFilter] = useState<string | null>(null)
   const [editingCategoryFor, setEditingCategoryFor] = useState<string | null>(null)
-  const [mobileRows, setMobileRows] = useState(data.transactions.rows)
-  const [mobilePage, setMobilePage] = useState(data.transactions.page)
-  const [mobilePageCount, setMobilePageCount] = useState(data.transactions.pageCount)
+  const [infiniteRows, setInfiniteRows] = useState(data.transactions.rows)
+  const [infinitePage, setInfinitePage] = useState(data.transactions.page)
+  const [infinitePageCount, setInfinitePageCount] = useState(data.transactions.pageCount)
+  const [desktopInfiniteScroll, setDesktopInfiniteScroll] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const preferencesAppliedRef = useRef(false)
   const useMobileList = useMediaQuery('(max-width: 980px)')
+  const useInfiniteList = useMobileList || desktopInfiniteScroll
   const page = data.transactions.page
   const pageSize = data.transactions.pageSize
   const pageCount = data.transactions.pageCount
   const total = data.transactions.total
-  const visibleRows = useMobileList ? mobileRows : data.transactions.rows
-  const mobileHasMore = mobilePage < mobilePageCount
+  const visibleRows = useInfiniteList ? infiniteRows : data.transactions.rows
+  const infiniteHasMore = infinitePage < infinitePageCount
 
   const navigateWith = (next: Partial<typeof params>) => {
     void router.navigate({
@@ -120,16 +127,49 @@ function TransactionsPage() {
   }
 
   useEffect(() => {
-    setMobileRows(data.transactions.rows)
-    setMobilePage(data.transactions.page)
-    setMobilePageCount(data.transactions.pageCount)
+    if (preferencesAppliedRef.current) {
+      return
+    }
+    preferencesAppliedRef.current = true
+
+    const storedInfiniteScroll = readStoredInfiniteScroll()
+    const storedPageSize = readStoredPageSize()
+    const next: Partial<typeof params> = {}
+
+    if (storedInfiniteScroll) {
+      setDesktopInfiniteScroll(true)
+      if (page !== 1) {
+        next.page = 1
+      }
+    }
+
+    if (params.pageSize == null && storedPageSize != null) {
+      next.pageSize = storedPageSize
+      next.page = 1
+    }
+
+    if (Object.keys(next).length) {
+      void router.navigate({
+        to: '/transactions',
+        search: {
+          ...params,
+          ...next,
+        },
+      })
+    }
+  }, [page, params, router])
+
+  useEffect(() => {
+    setInfiniteRows(data.transactions.rows)
+    setInfinitePage(data.transactions.page)
+    setInfinitePageCount(data.transactions.pageCount)
     setLoadingMore(false)
     setLoadMoreError(null)
   }, [data.transactions.page, data.transactions.pageCount, data.transactions.rows])
 
   useEffect(() => {
     const node = loadMoreRef.current
-    if (!node || !useMobileList || !mobileHasMore || loadingMore || loadMoreError) {
+    if (!node || !useInfiniteList || !infiniteHasMore || loadingMore || loadMoreError) {
       return
     }
 
@@ -141,11 +181,11 @@ function TransactionsPage() {
       setLoadingMore(true)
       setLoadMoreError(null)
       void getTransactionsData({
-        data: getTransactionQuery(params, mobilePage + 1),
+        data: getTransactionQuery(params, infinitePage + 1),
       }).then((result) => {
-        setMobileRows((rows) => appendUniqueTransactions(rows, result.transactions.rows))
-        setMobilePage(result.transactions.page)
-        setMobilePageCount(result.transactions.pageCount)
+        setInfiniteRows((rows) => appendUniqueTransactions(rows, result.transactions.rows))
+        setInfinitePage(result.transactions.page)
+        setInfinitePageCount(result.transactions.pageCount)
       }).catch((error: unknown) => {
         setLoadMoreError(error instanceof Error ? error.message : 'Could not load more transactions.')
       }).finally(() => {
@@ -157,32 +197,57 @@ function TransactionsPage() {
 
     observer.observe(node)
     return () => observer.disconnect()
-  }, [loadMoreError, loadingMore, mobileHasMore, mobilePage, params, useMobileList])
+  }, [infiniteHasMore, infinitePage, loadMoreError, loadingMore, params, useInfiniteList])
 
   const paginationControls = (
-    <div className={styles.tableControls}>
+    <div className={`${styles.tableControls} ${desktopInfiniteScroll ? styles.tableControlsInfinite : ''}`}>
       <span className={styles.paginationSummary}>
-        Showing {total ? ((page - 1) * pageSize) + 1 : 0}-{Math.min(page * pageSize, total)} of {total}
+        {desktopInfiniteScroll
+          ? `Loaded ${visibleRows.length} of ${total}`
+          : `Showing ${total ? ((page - 1) * pageSize) + 1 : 0}-${Math.min(page * pageSize, total)} of ${total}`}
       </span>
-      <label className={styles.pageSizeControl}>
-        <span>Rows</span>
-        <select
-          className={styles.field}
-          value={pageSize}
-          onChange={(event) => navigateWith({ pageSize: Number(event.target.value), page: 1 })}
-        >
-          {[10, 25, 50, 100].map((size) => (
-            <option key={size} value={size}>{size} per page</option>
-          ))}
-        </select>
+      <label className={styles.infiniteToggle}>
+        <input
+          checked={desktopInfiniteScroll}
+          type="checkbox"
+          onChange={(event) => {
+            const checked = event.target.checked
+            writeStoredInfiniteScroll(checked)
+            setDesktopInfiniteScroll(checked)
+            if (checked && page !== 1) {
+              navigateWith({ page: 1 })
+            }
+          }}
+        />
+        <span>Infinite scroll</span>
       </label>
-      <div className={styles.paginationButtons}>
-        <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: 1 })}>First</button>
-        <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: page - 1 })}>Prev</button>
-        <span className={styles.pageStatus}>Page {page} of {pageCount}</span>
-        <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: page + 1 })}>Next</button>
-        <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: pageCount })}>Last</button>
-      </div>
+      {!desktopInfiniteScroll ? (
+        <>
+          <label className={styles.pageSizeControl}>
+            <span>Rows</span>
+            <select
+              className={styles.field}
+              value={pageSize}
+              onChange={(event) => {
+                const nextPageSize = Number(event.target.value)
+                writeStoredPageSize(nextPageSize)
+                navigateWith({ pageSize: nextPageSize, page: 1 })
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size} per page</option>
+              ))}
+            </select>
+          </label>
+          <div className={styles.paginationButtons}>
+            <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: 1 })}>First</button>
+            <button className={styles.secondaryButton} disabled={page <= 1} type="button" onClick={() => navigateWith({ page: page - 1 })}>Prev</button>
+            <span className={styles.pageStatus}>Page {page} of {pageCount}</span>
+            <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: page + 1 })}>Next</button>
+            <button className={styles.secondaryButton} disabled={page >= pageCount} type="button" onClick={() => navigateWith({ page: pageCount })}>Last</button>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 
@@ -417,11 +482,58 @@ function TransactionsPage() {
           </tbody>
         </table>
       </div>
-      <div className={styles.mobileLoadMore} ref={loadMoreRef} aria-live="polite">
-        {loadMoreError ? loadMoreError : loadingMore ? 'Loading more transactions...' : mobileHasMore ? 'Scroll for more transactions' : visibleRows.length ? 'All matching transactions loaded' : ''}
+      <div
+        className={`${styles.mobileLoadMore} ${useInfiniteList ? styles.loadMoreActive : ''}`}
+        ref={loadMoreRef}
+        aria-live="polite"
+      >
+        {loadMoreError ? loadMoreError : loadingMore ? 'Loading more transactions...' : infiniteHasMore ? 'Scroll for more transactions' : visibleRows.length ? 'All matching transactions loaded' : ''}
       </div>
     </section>
   )
+}
+
+function readStoredInfiniteScroll() {
+  return readLocalStorage(TRANSACTIONS_INFINITE_SCROLL_STORAGE_KEY) === 'true'
+}
+
+function writeStoredInfiniteScroll(value: boolean) {
+  writeLocalStorage(TRANSACTIONS_INFINITE_SCROLL_STORAGE_KEY, String(value))
+}
+
+function readStoredPageSize() {
+  const value = Number(readLocalStorage(TRANSACTIONS_PAGE_SIZE_STORAGE_KEY))
+  return PAGE_SIZE_OPTIONS.includes(value) ? value : null
+}
+
+function writeStoredPageSize(value: number) {
+  if (PAGE_SIZE_OPTIONS.includes(value)) {
+    writeLocalStorage(TRANSACTIONS_PAGE_SIZE_STORAGE_KEY, String(value))
+  }
+}
+
+function readLocalStorage(key: string) {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeLocalStorage(key: string, value: string) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // Ignore storage failures; the control still works for the current session.
+  }
 }
 
 function getTransactionQuery(params: ReturnType<typeof Route.useSearch>, page: number) {

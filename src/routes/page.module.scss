@@ -421,9 +421,13 @@
   align-items: center;
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   min-width: 0;
   padding: 0.85rem 1rem;
+}
+
+.tableControlsInfinite {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .paginationSummary,
@@ -432,6 +436,62 @@
   color: $muted;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.infiniteToggle {
+  align-items: center;
+  background: $field;
+  border: 1px solid $line;
+  border-radius: 999px;
+  color: $ink;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 850;
+  gap: 0.5rem;
+  justify-self: end;
+  min-height: 2.4rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.35rem;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.infiniteToggle input {
+  appearance: none;
+  background: #d8deea;
+  border-radius: 999px;
+  cursor: pointer;
+  height: 1.35rem;
+  margin: 0;
+  position: relative;
+  transition: background 150ms ease;
+  width: 2.35rem;
+}
+
+.infiniteToggle input::after {
+  background: white;
+  border-radius: 999px;
+  box-shadow: 0 2px 5px rgba(31, 41, 55, 0.18);
+  content: '';
+  height: 1.05rem;
+  left: 0.15rem;
+  position: absolute;
+  top: 0.15rem;
+  transition: transform 150ms ease;
+  width: 1.05rem;
+}
+
+.infiniteToggle input:checked {
+  background: $accent;
+}
+
+.infiniteToggle input:checked::after {
+  transform: translateX(1rem);
+}
+
+.infiniteToggle input:focus-visible {
+  outline: 2px solid rgba($accent, 0.35);
+  outline-offset: 2px;
 }
 
 .pageSizeControl {
@@ -462,6 +522,16 @@
 
 .mobileLoadMore {
   display: none;
+}
+
+.loadMoreActive {
+  color: $muted;
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 750;
+  min-height: 2.25rem;
+  padding: 0.35rem 0 0.8rem;
+  text-align: center;
 }
 
 .error {
