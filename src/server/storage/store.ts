@@ -100,6 +100,7 @@ const defaultCategories: Array<Omit<CategoryRecord, 'createdAt'>> = [
   { id: 12, name: 'Fees', color: '#a73e2f' },
   { id: 13, name: 'Transfers', color: '#756c5b' },
   { id: 14, name: 'Uncategorized', color: '#9c6a18' },
+  { id: 15, name: 'Pets', color: '#8a6f3d' },
 ]
 
 let store: AppStore | undefined

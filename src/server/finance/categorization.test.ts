@@ -17,6 +17,7 @@ const categories = [
   category(12, 'Fees'),
   category(13, 'Transfers'),
   category(14, 'Uncategorized'),
+  category(15, 'Pets'),
 ]
 
 describe('local transaction categorization', () => {
@@ -92,6 +93,20 @@ describe('local transaction categorization', () => {
     }, categories, [])
 
     expect(result.categoryName).toBe('Income')
+  })
+
+  it('categorizes pet insurance and veterinary transactions as pets', () => {
+    const insurance = categorizeTransaction({
+      description: 'TRUPANION PET INSURANCE',
+      amount: -68.42,
+    }, categories, [])
+    const vet = categorizeTransaction({
+      description: 'VCA ANIMAL HOSPITAL',
+      amount: -142.1,
+    }, categories, [])
+
+    expect(insurance.categoryName).toBe('Pets')
+    expect(vet.categoryName).toBe('Pets')
   })
 
   it('still categorizes unknown outflows with a low-confidence fallback', () => {

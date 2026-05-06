@@ -14,6 +14,7 @@ import {
   HeartPulse,
   Home,
   Landmark,
+  PawPrint,
   Plane,
   Receipt,
   ShoppingBag,
@@ -87,6 +88,7 @@ function TransactionsPage() {
   const [mobilePageCount, setMobilePageCount] = useState(data.transactions.pageCount)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const useMobileList = useMediaQuery('(max-width: 980px)')
   const page = data.transactions.page
@@ -191,8 +193,18 @@ function TransactionsPage() {
           <p className={styles.kicker}>All institutions</p>
           <h1 className={styles.heading}>Transactions</h1>
         </div>
-        <button className={styles.button} type="button" onClick={() => void syncNow().then(() => router.invalidate())}>
-          Sync now
+        <button
+          className={styles.button}
+          disabled={syncing}
+          type="button"
+          onClick={() => {
+            setSyncing(true)
+            void syncNow()
+              .then(() => router.invalidate())
+              .finally(() => setSyncing(false))
+          }}
+        >
+          {syncing ? 'Syncing...' : 'Sync now'}
         </button>
       </header>
 
@@ -621,6 +633,7 @@ function getCategoryIcon(name: string): LucideIcon {
   if (normalized === 'entertainment') return Clapperboard
   if (normalized === 'travel') return Plane
   if (normalized === 'personal care') return Sparkles
+  if (normalized === 'pets') return PawPrint
   if (normalized === 'fees') return Receipt
   if (normalized === 'transfers') return ArrowLeftRight
   if (normalized === 'uncategorized') return CircleHelp

@@ -344,16 +344,21 @@ function Metric({
 
 function SyncButton() {
   const router = useRouter()
+  const [syncing, setSyncing] = useState(false)
 
   return (
     <button
       className={styles.button}
+      disabled={syncing}
       type="button"
       onClick={() => {
-        void syncNow().then(() => router.invalidate())
+        setSyncing(true)
+        void syncNow()
+          .then(() => router.invalidate())
+          .finally(() => setSyncing(false))
       }}
     >
-      Sync now
+      {syncing ? 'Syncing...' : 'Sync now'}
     </button>
   )
 }

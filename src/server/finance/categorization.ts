@@ -114,6 +114,17 @@ const categoryGroups: CategoryGroup[] = [
     ],
   },
   {
+    categoryName: 'Pets',
+    confidence: 0.88,
+    reason: 'matched pet insurance, veterinary, or pet care merchant',
+    patterns: [
+      /\b(pet\s+insurance|petinsurance|pet\s+ins|veterinary|veterinarian|vet\s|vetco)\b/,
+      /\b(animal\s+hospital|animal\s+clinic|pet\s+hospital|pet\s+clinic|pet\s+care)\b/,
+      /\b(chewy|petco|petsmart|pet\s*smart|banfield|vca\s+animal|bluepearl)\b/,
+      /\b(trupanion|healthy\s+paws|embrace\s+pet|figo\s+pet|aspca\s+pet|nationwide\s+pet|pumpkin\s+pet|lemonade\s+pet)\b/,
+    ],
+  },
+  {
     categoryName: 'Healthcare',
     confidence: 0.88,
     reason: 'matched pharmacy, medical, dental, or insurance merchant',

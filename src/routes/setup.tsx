@@ -25,6 +25,7 @@ function SetupPage() {
   const [csvAccountId, setCsvAccountId] = useState('')
   const [csvInputKey, setCsvInputKey] = useState(0)
   const [importingCsv, setImportingCsv] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const csvFileLabel = csvFiles?.length
     ? [...csvFiles].map((file) => file.name).join(', ')
     : 'No CSV selected'
@@ -78,8 +79,27 @@ function SetupPage() {
           </p>
           {data.status.latestSync?.message ? <p className={styles.subtle}>{data.status.latestSync.message}</p> : null}
           <div className={styles.toolbar}>
-            <button className={styles.button} type="button" onClick={() => void syncNow().then(() => router.invalidate())}>
-              Sync now
+            <button
+              className={styles.button}
+              disabled={syncing}
+              type="button"
+              onClick={() => {
+                setSyncing(true)
+                setMessage('Syncing...')
+                void syncNow()
+                  .then((result) => {
+                    setMessage(result.message)
+                    return router.invalidate()
+                  })
+                  .catch((error: unknown) => {
+                    setMessage(error instanceof Error ? error.message : 'Sync failed.')
+                  })
+                  .finally(() => {
+                    setSyncing(false)
+                  })
+              }}
+            >
+              {syncing ? 'Syncing...' : 'Sync now'}
             </button>
             <button
               className={styles.secondaryButton}
